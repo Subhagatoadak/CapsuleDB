@@ -286,26 +286,26 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 1 — Capsule Core MVP
 
-- [ ] Create the Rust workspace
-- [ ] Implement capsule core types
-- [ ] Add JSON Schema support
-- [ ] Add capsule parsing and serialisation
-- [ ] Add schema-version validation
-- [ ] Add logical ID validation
-- [ ] Add semantic version handling
-- [ ] Add content hashing
-- [ ] Add source fingerprinting
-- [ ] Add lifecycle-transition enforcement
-- [ ] Add epistemic-envelope validation
-- [ ] Add mandatory evidence validation
-- [ ] Add confidence-ceiling validation
-- [ ] Add applicability validation
-- [ ] Add deterministic contradiction markers
-- [ ] Build the first `capsule` CLI
-- [ ] Support `capsule inspect`
-- [ ] Support `capsule validate`
-- [ ] Support `capsule pack`
-- [ ] Support `capsule unpack`
+- [x] Create the Rust workspace ([`Cargo.toml`](Cargo.toml))
+- [x] Implement capsule core types ([`capsule-core/src/types.rs`](capsule-core/src/types.rs))
+- [x] Add JSON Schema support ([`schemas/capsule.schema.json`](schemas/capsule.schema.json))
+- [x] Add capsule parsing and serialisation
+- [x] Add schema-version validation
+- [x] Add logical ID validation
+- [x] Add semantic version handling
+- [x] Add content hashing ([`capsule-core/src/hashing.rs`](capsule-core/src/hashing.rs))
+- [x] Add source fingerprinting
+- [x] Add lifecycle-transition enforcement ([`capsule-core/src/lifecycle.rs`](capsule-core/src/lifecycle.rs))
+- [x] Add epistemic-envelope validation ([`capsule-core/src/validation.rs`](capsule-core/src/validation.rs))
+- [x] Add mandatory evidence validation
+- [x] Add confidence-ceiling validation
+- [x] Add applicability validation
+- [x] Add deterministic contradiction markers
+- [x] Build the first `capsule` CLI ([`capsule-cli`](capsule-cli))
+- [x] Support `capsule inspect`
+- [x] Support `capsule validate`
+- [x] Support `capsule pack`
+- [x] Support `capsule unpack`
 
 ## Phase 2 — Capsule Registry
 
@@ -499,7 +499,13 @@ CapsuleDB/
 
 ## Current status
 
-CapsuleDB is at the concept and architecture stage. The first development milestone is the Knowledge Capsule specification and a small Rust-based capsule core that can parse, validate, hash, inspect, and package capsules.
+Phase 0 (protocol and specification) and Phase 1 (Capsule Core MVP) are implemented:
+
+- The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
+- `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
+- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, and `unpack` against the canonical sample capsules in `examples/capsules/`.
+
+Phase 2 (Capsule Registry) has not started. See the roadmap below for what's next.
 
 ---
 

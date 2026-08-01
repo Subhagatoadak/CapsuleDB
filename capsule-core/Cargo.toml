@@ -1,0 +1,18 @@
+[package]
+name = "capsule-core"
+description = "Core Knowledge Capsule types, parsing, hashing, lifecycle, and epistemic validation for CapsuleDB (KCP 0.1)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+semver.workspace = true
+regex.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
