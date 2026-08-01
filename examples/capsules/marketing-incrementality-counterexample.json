@@ -1,0 +1,50 @@
+{
+  "schema_version": "kcp/0.1",
+  "logical_id": "kc://marketing/incrementality/paid-search-lift-q1-2026-counterexample",
+  "version": "1.0.0",
+  "capsule_type": "counterexample",
+  "statement": "A follow-up audit found the Q1 2026 geo-holdout markets were not fully randomized, which may bias the 6-9% lift estimate upward.",
+  "epistemic_status": "disputed",
+  "confidence": {
+    "basis": "unsupported",
+    "ceiling": 0.3,
+    "rationale": "Audit is preliminary and has not been independently replicated; treated as an open dispute rather than a settled correction."
+  },
+  "lifecycle_state": "published",
+  "evidence": [
+    {
+      "source_id": "geo-holdout-audit-memo",
+      "span": "findings, paragraph 2",
+      "excerpt": "Market assignment in the Q1 holdout was not fully randomized; three markets were manually reassigned after initial selection.",
+      "authority": "secondary",
+      "retrieved_at": "2026-05-10T08:00:00Z"
+    }
+  ],
+  "applicability": {
+    "jurisdictions": [],
+    "valid_from": "2026-05-10",
+    "valid_until": null,
+    "conditions": [],
+    "exclusions": []
+  },
+  "contradictions": [
+    {
+      "capsule_id": "kc://marketing/incrementality/paid-search-lift-q1-2026",
+      "description": "Challenges the validity of the randomization underlying the 6-9% lift estimate.",
+      "resolution_status": "unresolved"
+    }
+  ],
+  "dependencies": [],
+  "governance": {
+    "owner": "growth-analytics",
+    "domain": "marketing",
+    "permissions": ["read"]
+  },
+  "evaluation_contract": {
+    "mandatory_qualifications": ["preliminary audit finding, unresolved"],
+    "prohibited_overclaims": ["the original lift estimate is definitively wrong"],
+    "evaluation_rules": [
+      "any answer citing the Q1 2026 lift estimate must also surface this unresolved contradiction"
+    ]
+  }
+}

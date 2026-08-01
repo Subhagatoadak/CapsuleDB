@@ -270,19 +270,19 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 ## Phase 0 — Product and protocol definition
 
 - [ ] Finalise the CapsuleDB product charter
-- [ ] Define the minimum Knowledge Capsule specification
-- [ ] Define capsule identity conventions such as `kc://domain/topic/name`
-- [ ] Define immutable logical identity and content-addressed identity
-- [ ] Define capsule types: fact, rule, procedure, metric, interpretation, boundary, counterexample, and rubric
-- [ ] Define lifecycle states
-- [ ] Define epistemic status vocabulary
-- [ ] Define authority and evidence vocabularies
-- [ ] Define confidence basis and confidence ceiling semantics
-- [ ] Define applicability and exclusion semantics
-- [ ] Define contradiction and supersession semantics
-- [ ] Draft Knowledge Capsule Protocol v0.1
-- [ ] Draft `.kcap` package structure
-- [ ] Create canonical sample capsules
+- [x] Define the minimum Knowledge Capsule specification ([spec](docs/specification/knowledge-capsule-spec.md))
+- [x] Define capsule identity conventions such as `kc://domain/topic/name`
+- [x] Define immutable logical identity and content-addressed identity
+- [x] Define capsule types: fact, rule, procedure, metric, interpretation, boundary, counterexample, and rubric
+- [x] Define lifecycle states
+- [x] Define epistemic status vocabulary
+- [x] Define authority and evidence vocabularies
+- [x] Define confidence basis and confidence ceiling semantics
+- [x] Define applicability and exclusion semantics
+- [x] Define contradiction and supersession semantics
+- [x] Draft Knowledge Capsule Protocol v0.1 ([protocol](protocol/KCP-v0.1.md))
+- [x] Draft `.kcap` package structure ([format](protocol/kcap-package-format.md))
+- [x] Create canonical sample capsules ([examples](examples/capsules/))
 
 ## Phase 1 — Capsule Core MVP
 
