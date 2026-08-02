@@ -1,0 +1,44 @@
+{
+  "schema_version": "kcp/0.1",
+  "logical_id": "kc://policy/data-retention/customer-data-90-days",
+  "version": "1.0.0",
+  "capsule_type": "rule",
+  "statement": "Customer transaction data must be retained for no more than 90 days after account closure, unless a legal hold applies.",
+  "epistemic_status": "policy_defined",
+  "confidence": {
+    "basis": "policy_mandate",
+    "ceiling": 0.95,
+    "rationale": "Directly stated in the governing data retention policy document, section 4.2."
+  },
+  "lifecycle_state": "published",
+  "evidence": [
+    {
+      "source_id": "data-retention-policy-v3",
+      "span": "section 4.2",
+      "excerpt": "Transaction data shall be retained for a maximum of ninety (90) days following account closure, except where a legal hold has been issued.",
+      "authority": "primary",
+      "retrieved_at": "2026-01-15T09:00:00Z"
+    }
+  ],
+  "applicability": {
+    "jurisdictions": ["IN"],
+    "valid_from": "2026-01-01",
+    "valid_until": null,
+    "conditions": ["account has been formally closed"],
+    "exclusions": ["records subject to an active legal hold"]
+  },
+  "contradictions": [],
+  "dependencies": [],
+  "governance": {
+    "owner": "privacy-office",
+    "domain": "policy",
+    "permissions": ["read"]
+  },
+  "evaluation_contract": {
+    "mandatory_qualifications": ["unless a legal hold applies"],
+    "prohibited_overclaims": ["data is always deleted after 90 days"],
+    "evaluation_rules": [
+      "answers must not state the retention period without the legal-hold exception"
+    ]
+  }
+}

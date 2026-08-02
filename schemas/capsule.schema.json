@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://capsuledb.dev/schemas/kcp/0.1/capsule.schema.json",
+  "title": "Knowledge Capsule (KCP 0.1)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "logical_id",
+    "version",
+    "capsule_type",
+    "statement",
+    "epistemic_status",
+    "confidence",
+    "lifecycle_state",
+    "governance"
+  ],
+  "properties": {
+    "schema_version": { "const": "kcp/0.1" },
+    "logical_id": {
+      "type": "string",
+      "pattern": "^kc://[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "capsule_type": {
+      "enum": ["fact", "rule", "procedure", "metric", "interpretation", "boundary", "counterexample", "rubric"]
+    },
+    "statement": { "type": "string", "minLength": 1 },
+    "epistemic_status": {
+      "enum": ["observed", "inferred", "estimated", "modelled", "policy_defined", "expert_judgement", "disputed", "unknown"]
+    },
+    "confidence": {
+      "type": "object",
+      "required": ["basis", "ceiling"],
+      "properties": {
+        "basis": {
+          "enum": ["direct_observation", "statistical_inference", "expert_consensus", "model_prediction", "policy_mandate", "heuristic", "unsupported"]
+        },
+        "ceiling": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "rationale": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "lifecycle_state": {
+      "enum": ["draft", "in_review", "approved", "published", "deprecated", "superseded", "revoked"]
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_id", "authority"],
+        "properties": {
+          "source_id": { "type": "string" },
+          "span": { "type": "string" },
+          "excerpt": { "type": "string" },
+          "authority": { "enum": ["primary", "secondary", "derived", "unverified"] },
+          "retrieved_at": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "properties": {
+        "jurisdictions": { "type": "array", "items": { "type": "string" } },
+        "valid_from": { "type": ["string", "null"], "format": "date" },
+        "valid_until": { "type": ["string", "null"], "format": "date" },
+        "conditions": { "type": "array", "items": { "type": "string" } },
+        "exclusions": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["capsule_id", "description", "resolution_status"],
+        "properties": {
+          "capsule_id": { "type": "string" },
+          "description": { "type": "string" },
+          "resolution_status": { "enum": ["unresolved", "resolved", "acknowledged"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["capsule_id", "relation"],
+        "properties": {
+          "capsule_id": { "type": "string" },
+          "relation": { "enum": ["requires", "refines", "supersedes"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "governance": {
+      "type": "object",
+      "required": ["owner", "domain"],
+      "properties": {
+        "owner": { "type": "string" },
+        "domain": { "type": "string" },
+        "permissions": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "evaluation_contract": {
+      "type": "object",
+      "properties": {
+        "mandatory_qualifications": { "type": "array", "items": { "type": "string" } },
+        "prohibited_overclaims": { "type": "array", "items": { "type": "string" } },
+        "evaluation_rules": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
