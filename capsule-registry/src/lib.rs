@@ -270,6 +270,17 @@ impl Registry {
         Ok(ids)
     }
 
+    /// `(distinct_payloads, total_versions)` — the raw numbers behind
+    /// content-addressed dedup (spec §2.3): how many distinct epistemic
+    /// payloads are stored versus how many capsule versions reference
+    /// them. `capsule-observatory`'s "capsule reuse ratio" is derived
+    /// from this.
+    pub fn dedup_stats(&self) -> Result<(u64, u64), RegistryError> {
+        let payloads: u64 = self.conn.query_row("SELECT COUNT(*) FROM capsule_payloads", [], |row| row.get(0))?;
+        let versions: u64 = self.conn.query_row("SELECT COUNT(*) FROM capsule_versions", [], |row| row.get(0))?;
+        Ok((payloads, versions))
+    }
+
     /// All registered versions of a logical ID, newest SemVer first.
     pub fn list_versions(&self, logical_id: &str) -> Result<Vec<CapsuleRecord>, RegistryError> {
         let mut stmt = self.conn.prepare("SELECT version FROM capsule_versions WHERE logical_id = ?1")?;
@@ -613,6 +624,10 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM capsule_payloads WHERE content_hash = ?1", params![ra.content_hash], |r| r.get(0))
             .unwrap();
         assert_eq!(payload_rows, 1);
+
+        let (payloads, versions) = registry.dedup_stats().unwrap();
+        assert_eq!(payloads, 1);
+        assert_eq!(versions, 2);
     }
 
     #[test]

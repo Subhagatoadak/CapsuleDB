@@ -1,5 +1,6 @@
 mod compile_cmd;
 mod evaluate_cmd;
+mod observatory_cmd;
 mod registry_cmd;
 mod resolve_cmd;
 
@@ -121,6 +122,15 @@ enum Command {
         #[arg(long, value_enum, default_value = "low")]
         discretion: DiscretionArg,
     },
+    /// Run registry-wide health checks: freshness, contradictions, orphans, broken dependencies, and more.
+    Observatory {
+        #[arg(long, default_value = "capsuledb.sqlite3")]
+        db: PathBuf,
+        #[arg(long, default_value_t = 180)]
+        freshness_days: i64,
+        #[arg(long, default_value_t = 30)]
+        knowledge_debt_days: i64,
+    },
 }
 
 fn main() -> Result<()> {
@@ -137,6 +147,7 @@ fn main() -> Result<()> {
         }
         Command::Keygen { out_prefix } => cmd_keygen(out_prefix.as_deref()),
         Command::Evaluate { answer_file, db, discretion } => evaluate_cmd::run(&db, &answer_file, discretion),
+        Command::Observatory { db, freshness_days, knowledge_debt_days } => observatory_cmd::run_cmd(&db, freshness_days, knowledge_debt_days),
     }
 }
 

@@ -105,3 +105,16 @@ manifest and the three scores. `--discretion` widens the ambiguous-
 support band referred to a judge; no real judge is wired in yet (see
 `capsule-evaluator/README.md`), so referred claims always come back
 "Abstain."
+
+## Observatory
+
+```bash
+capsule observatory --db capsules.sqlite3 --freshness-days 180 --knowledge-debt-days 30
+```
+
+Registry-wide health checks: freshness, unresolved contradictions,
+orphaned (no-dependent) capsules, broken dependencies, confidence-
+laundering incidents (a capsule's own statement vs. its own evidence
+excerpt), knowledge debt (stale unpublished drafts), expiry alerts
+(published past `applicability.valid_until`), and the capsule reuse
+ratio. See `capsule-observatory/README.md`.

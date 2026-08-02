@@ -190,6 +190,7 @@ dependencies = [
  "capsule-compiler",
  "capsule-core",
  "capsule-evaluator",
+ "capsule-observatory",
  "capsule-registry",
  "capsule-resolver",
  "capsule-runtime",
@@ -234,6 +235,19 @@ dependencies = [
  "capsule-compiler",
  "capsule-core",
  "capsule-registry",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "capsule-observatory"
+version = "0.1.0"
+dependencies = [
+ "capsule-compiler",
+ "capsule-core",
+ "capsule-registry",
+ "chrono",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

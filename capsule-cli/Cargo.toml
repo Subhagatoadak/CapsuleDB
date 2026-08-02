@@ -17,6 +17,7 @@ capsule-compiler = { path = "../capsule-compiler" }
 capsule-resolver = { path = "../capsule-resolver" }
 capsule-runtime = { path = "../capsule-runtime" }
 capsule-evaluator = { path = "../capsule-evaluator" }
+capsule-observatory = { path = "../capsule-observatory" }
 serde.workspace = true
 serde_json.workspace = true
 clap.workspace = true

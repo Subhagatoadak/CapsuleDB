@@ -417,17 +417,17 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 8 — Capsule Observatory
 
-- [ ] Track capsule freshness
-- [ ] Track source availability
-- [ ] Track unresolved contradictions
-- [ ] Track orphaned capsules
-- [ ] Track broken dependencies
-- [ ] Track confidence-laundering incidents
-- [ ] Track evaluation-surface reduction
-- [ ] Track capsule reuse ratio
-- [ ] Track delta-update efficiency
-- [ ] Track knowledge debt
-- [ ] Trigger review and expiry alerts
+- [x] Track capsule freshness ([`capsule-observatory`](capsule-observatory))
+- [ ] Track source availability (no source carries a URL/liveness contract to check yet)
+- [x] Track unresolved contradictions
+- [x] Track orphaned capsules (published, zero dependents — informational, not inherently a problem)
+- [x] Track broken dependencies
+- [x] Track confidence-laundering incidents (within a capsule: its own statement vs. its own evidence excerpt)
+- [ ] Track evaluation-surface reduction (`capsule-evaluator` doesn't persist past reports for this to aggregate over)
+- [x] Track capsule reuse ratio (derived from the content-addressed dedup in `capsule-registry`)
+- [ ] Track delta-update efficiency (no delta compilation exists to measure — see Phase 3)
+- [x] Track knowledge debt (stale unpublished drafts/in_review capsules)
+- [x] Trigger review and expiry alerts (published past `applicability.valid_until`)
 
 ## Phase 9 — Ecosystem and interoperability
 
@@ -499,7 +499,7 @@ CapsuleDB/
 
 ## Current status
 
-Phases 0-7 are implemented:
+Phases 0-8 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
@@ -510,12 +510,13 @@ Phases 0-7 are implemented:
 - `capsule-api` is a minimal HTTP JSON API built directly on `capsule-runtime`, so policy/views/caching/telemetry apply over the network too. Tested with real HTTP requests, not mocks.
 - `sdk-python` and `sdk-typescript` are dependency-free HTTP clients for `capsule-api`, both smoke-tested end to end against a live server.
 - `capsule-evaluator` evaluates an answer against the capsules that back it: claim decomposition, claim-to-capsule mapping (explicit citation or lexical overlap, split into strong/ambiguous bands), seven deterministic detectors, an evaluation-surface manifest, and the three scores from the roadmap. A bounded-judge boundary is real (only ambiguous claims are ever referred) but no LLM judge is wired in — `NullJudge` always abstains.
-- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, `keygen`, `evaluate`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve → evaluate loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
+- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, `keygen`, `evaluate`, `observatory`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve → evaluate loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
 - `capsule-studio` is a single static `index.html` (no build step) driving `capsule-api` from a browser: inspection, evidence/confidence/contradiction viewers, dependency lookups, the approval workflow, resolution, and evaluation reports. Driven end to end in a real headless-Chromium session, which caught and led to fixing a genuine bug — `GET /capsule` was serving a stale cached copy after a transition, because the mutating endpoints wrote to the registry without invalidating `capsule-runtime`'s cache.
+- `capsule-observatory` runs registry-wide health checks: freshness, unresolved contradictions, orphaned capsules, broken dependencies, confidence-laundering incidents, knowledge debt, expiry alerts, and the capsule reuse ratio.
 
 Building all of this surfaced and fixed three real bugs from earlier phases, each caught by actually exercising the system rather than by inspection: the content hash originally covered identity fields, making the spec's own cross-logical-ID dedup claim impossible (fixed in Phase 2); the resolver treated an anonymous request as bypassing permission checks entirely rather than as unprivileged (fixed while building Phase 5, alongside correcting the Phase 0 example capsules and spec wording that had conflated permission *roles* with capability *verbs*); and `capsule-api`'s mutating routes wrote straight to the registry without invalidating `capsule-runtime`'s cache, so a capsule fetched once would appear stuck at its first-seen lifecycle state forever (found by driving Capsule Studio in a real browser against a live server, fixed in Phase 7).
 
-Phase 8 (Capsule Observatory) has not started. See the roadmap below for what's next.
+Phase 9 (Ecosystem and interoperability) has not started. See the roadmap below for what's next.
 
 ---
 
