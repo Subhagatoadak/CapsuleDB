@@ -54,11 +54,23 @@ A capsule also has an immutable `content_hash`:
 sha256:<hex>
 ```
 
-Computed over the canonical JSON serialization of the capsule document with
-the `content_hash` field itself excluded (see `capsule-core::hashing` for the
-canonicalization algorithm: UTF-8, keys sorted lexicographically, no
-insignificant whitespace). Two capsules with identical content — even under
-different logical IDs — hash identically, enabling deduplication.
+Computed over the canonical JSON serialization of the capsule's **epistemic
+payload**: the full document with the identity and administrative fields
+`content_hash`, `logical_id`, `version`, `lifecycle_state`, and `governance`
+removed first (see `capsule-core::hashing` for the canonicalization
+algorithm: UTF-8, keys sorted lexicographically, no insignificant
+whitespace). Everything that describes *what is known* — `statement`,
+`epistemic_status`, `confidence`, `evidence`, `applicability`,
+`contradictions`, `dependencies`, `evaluation_contract` — participates in
+the hash; everything that describes *who filed it, under what name, at
+what stage* does not.
+
+This means two capsules with identical epistemic content hash identically
+even under different logical IDs, owners, or lifecycle states. That
+equality is the deduplication key: `capsule-registry` stores a payload
+once per distinct `content_hash` and lets any number of `capsule_versions`
+rows reference it, which is also how it surfaces evidence or claims reused
+verbatim across unrelated capsules.
 
 ## 3. Capsule types
 

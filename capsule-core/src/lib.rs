@@ -12,7 +12,7 @@ pub mod lifecycle;
 pub mod types;
 pub mod validation;
 
-pub use hashing::{canonicalize, content_hash, source_fingerprint};
+pub use hashing::{canonicalize, content_hash, content_payload, rehydrate, source_fingerprint};
 pub use lifecycle::{check_transition, InvalidTransition};
 pub use types::*;
 pub use validation::{is_valid, validate, Severity, ValidationIssue};

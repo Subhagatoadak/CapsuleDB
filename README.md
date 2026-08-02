@@ -309,39 +309,39 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 2 — Capsule Registry
 
-- [ ] Design the PostgreSQL schema
-- [ ] Implement capsule metadata persistence
-- [ ] Implement immutable version storage
-- [ ] Implement bitemporal validity
-- [ ] Add owners and domain ownership
-- [ ] Add lifecycle status management
-- [ ] Add approval records
-- [ ] Add publication and revocation records
-- [ ] Add content-addressed deduplication
-- [ ] Add capsule dependency records
-- [ ] Add evidence-family tracking
-- [ ] Add audit events
-- [ ] Add registry APIs
-- [ ] Add local SQLite mode
+- [x] Design the PostgreSQL schema ([draft DDL](capsule-registry/postgres-schema.sql))
+- [x] Implement capsule metadata persistence
+- [x] Implement immutable version storage
+- [x] Implement bitemporal validity (`valid_from`/`valid_until` application time + immutable `recorded_at`/`occurred_at` system time)
+- [x] Add owners and domain ownership
+- [x] Add lifecycle status management
+- [x] Add approval records
+- [x] Add publication and revocation records
+- [x] Add content-addressed deduplication (content hash covers the epistemic payload only, so identical claims dedupe across logical IDs)
+- [x] Add capsule dependency records
+- [x] Add evidence-family tracking
+- [x] Add audit events
+- [x] Add registry APIs (Rust crate API; `capsule registry ...` CLI surface — a networked `capsule-api` is still Phase 5)
+- [x] Add local SQLite mode ([`capsule-registry`](capsule-registry), the Phase 2 MVP backend)
 
 ## Phase 3 — Capsule Compiler
 
-- [ ] Build source ingestion contracts
-- [ ] Add PDF, text, Markdown, and HTML adapters
-- [ ] Add source structure preservation
-- [ ] Add semantic-boundary detection
-- [ ] Add claim extraction
-- [ ] Pair claims with qualifications and limitations
-- [ ] Bind claims to exact source spans
-- [ ] Classify epistemic status
-- [ ] Detect applicability conditions
-- [ ] Detect exceptions and exclusions
-- [ ] Detect dependencies
-- [ ] Detect source-derived evidence duplication
-- [ ] Add source-to-capsule transformation lineage
-- [ ] Add confidence-inflation detection
-- [ ] Add deterministic validation before LLM validation
-- [ ] Add human review workflow
+- [x] Build source ingestion contracts ([`capsule-compiler/src/source.rs`](capsule-compiler/src/source.rs))
+- [ ] Add PDF, text, Markdown, and HTML adapters (text/Markdown/HTML done; PDF deliberately stubbed as unsupported, see [`capsule-compiler/README.md`](capsule-compiler/README.md))
+- [x] Add source structure preservation
+- [x] Add semantic-boundary detection (heuristic sentence segmentation)
+- [x] Add claim extraction
+- [x] Pair claims with qualifications and limitations (wired into `evaluation_contract.mandatory_qualifications`)
+- [x] Bind claims to exact source spans
+- [x] Classify epistemic status (lexical-cue classifier)
+- [x] Detect applicability conditions
+- [x] Detect exceptions and exclusions
+- [x] Detect dependencies (bare `kc://` reference mentions, surfaced for human review rather than auto-wired — the relation isn't inferable from a mention alone)
+- [x] Detect source-derived evidence duplication
+- [x] Add source-to-capsule transformation lineage
+- [x] Add confidence-inflation detection ([`capsule-compiler/src/inflation.rs`](capsule-compiler/src/inflation.rs), the README's confidence-laundering patterns)
+- [x] Add deterministic validation before LLM validation (every candidate runs through `capsule_core::validate` immediately; there is no LLM step yet)
+- [ ] Add human review workflow (the `capsule-registry` lifecycle gate provides the mechanism; no queueing/UI yet)
 - [ ] Add delta compilation for changed source spans
 
 ## Phase 4 — Capsule Resolver
@@ -499,13 +499,15 @@ CapsuleDB/
 
 ## Current status
 
-Phase 0 (protocol and specification) and Phase 1 (Capsule Core MVP) are implemented:
+Phases 0-3 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
-- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, and `unpack` against the canonical sample capsules in `examples/capsules/`.
+- `capsule-registry` persists capsules in embedded SQLite: immutable versions, an append-only lifecycle/approval/publication/revocation ledger, content-addressed deduplication, dependency and evidence-family tracking, auto-supersession on publish, and an audit trail. A Postgres schema is drafted for a later backend.
+- `capsule-compiler` turns text/Markdown/HTML sources into draft candidate capsules deterministically: span-bound claim extraction, epistemic-status classification, qualification/exclusion/condition detection, evidence-duplication detection, and immediate `capsule_core::validate` pre-validation — no LLM step yet. PDF ingestion is explicitly unsupported for now.
+- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
 
-Phase 2 (Capsule Registry) has not started. See the roadmap below for what's next.
+Phase 4 (Capsule Resolver) has not started. See the roadmap below for what's next.
 
 ---
 

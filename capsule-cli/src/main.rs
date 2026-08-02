@@ -1,9 +1,14 @@
+mod compile_cmd;
+mod registry_cmd;
+
 use anyhow::{bail, Context, Result};
 use capsule_core::{content_hash, is_valid, parse, validate, Capsule, Severity};
 use clap::{Parser, Subcommand};
+use compile_cmd::SourceFormatArg;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use registry_cmd::RegistryCommand;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
@@ -47,6 +52,32 @@ enum Command {
         #[arg(short, long)]
         output: PathBuf,
     },
+    /// Register, transition, publish, and inspect capsules in a
+    /// SQLite-backed capsule-registry.
+    Registry {
+        /// Path to the registry's SQLite database (created if missing).
+        #[arg(long, default_value = "capsuledb.sqlite3", global = true)]
+        db: PathBuf,
+        #[command(subcommand)]
+        action: RegistryCommand,
+    },
+    /// Compile a source document into candidate draft capsules (deterministic, no LLM step).
+    Compile {
+        /// Path to the source document.
+        source: PathBuf,
+        /// Source format; inferred from the file extension if omitted.
+        #[arg(long, value_enum)]
+        format: Option<SourceFormatArg>,
+        #[arg(long)]
+        domain: String,
+        #[arg(long)]
+        topic: String,
+        #[arg(long)]
+        owner: String,
+        /// Directory to write one JSON draft capsule per extracted claim.
+        #[arg(long, default_value = "draft-capsules")]
+        out_dir: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -56,10 +87,12 @@ fn main() -> Result<()> {
         Command::Validate { capsule } => cmd_validate(&capsule),
         Command::Pack { capsule, output, evidence_dir } => cmd_pack(&capsule, &output, evidence_dir.as_deref()),
         Command::Unpack { package, output } => cmd_unpack(&package, &output),
+        Command::Registry { db, action } => registry_cmd::run(&db, action),
+        Command::Compile { source, format, domain, topic, owner, out_dir } => compile_cmd::run(&source, format, &domain, &topic, &owner, &out_dir),
     }
 }
 
-fn load_capsule(path: &Path) -> Result<Capsule> {
+pub(crate) fn load_capsule(path: &Path) -> Result<Capsule> {
     let text = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     parse(&text).with_context(|| format!("parsing capsule at {}", path.display()))
 }
