@@ -327,7 +327,7 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 ## Phase 3 — Capsule Compiler
 
 - [x] Build source ingestion contracts ([`capsule-compiler/src/source.rs`](capsule-compiler/src/source.rs))
-- [ ] Add PDF, text, Markdown, and HTML adapters (text/Markdown/HTML done; PDF deliberately stubbed as unsupported, see [`capsule-compiler/README.md`](capsule-compiler/README.md))
+- [x] Add PDF, text, Markdown, and HTML adapters (PDF via `pdf-extract`, pure Rust — plain-text extraction only, no layout/heading analysis; see [`capsule-compiler/README.md`](capsule-compiler/README.md))
 - [x] Add source structure preservation
 - [x] Add semantic-boundary detection (heuristic sentence segmentation)
 - [x] Add claim extraction
@@ -504,7 +504,7 @@ Phases 0-3 are implemented:
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
 - `capsule-registry` persists capsules in embedded SQLite: immutable versions, an append-only lifecycle/approval/publication/revocation ledger, content-addressed deduplication, dependency and evidence-family tracking, auto-supersession on publish, and an audit trail. A Postgres schema is drafted for a later backend.
-- `capsule-compiler` turns text/Markdown/HTML sources into draft candidate capsules deterministically: span-bound claim extraction, epistemic-status classification, qualification/exclusion/condition detection, evidence-duplication detection, and immediate `capsule_core::validate` pre-validation — no LLM step yet. PDF ingestion is explicitly unsupported for now.
+- `capsule-compiler` turns text/Markdown/HTML/PDF sources into draft candidate capsules deterministically: span-bound claim extraction, epistemic-status classification, qualification/exclusion/condition detection, evidence-duplication detection, and immediate `capsule_core::validate` pre-validation — no LLM step yet.
 - `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
 
 Phase 4 (Capsule Resolver) has not started. See the roadmap below for what's next.

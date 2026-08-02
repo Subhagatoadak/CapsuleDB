@@ -51,7 +51,7 @@ dependency target that is currently `published` (see
 capsule compile policy.md --domain policy --topic retention --owner alice --out-dir drafts/
 ```
 
-Extracts one draft candidate capsule per sentence from a text/Markdown/HTML
+Extracts one draft candidate capsule per sentence from a text/Markdown/HTML/PDF
 source (`--format` overrides extension-based detection), writes each as
 `drafts/NNN.json`, and prints per-candidate epistemic classification,
 detected qualifications/exclusions/conditions, bare `kc://` references

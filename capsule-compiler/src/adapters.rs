@@ -34,15 +34,22 @@ pub fn ingest_html(bytes: &[u8]) -> Result<Source, CompilerError> {
     Ok(Source { id: source_fingerprint(bytes), format: SourceFormat::Html, text, blocks })
 }
 
-/// PDF text extraction is not implemented in the Phase 3 MVP: robust PDF
-/// text extraction needs font/encoding handling that is a project of its
-/// own, and pulling in a heavy dependency for a partial job seemed worse
-/// than being explicit that it's unsupported. Always returns
-/// `CompilerError::UnsupportedFormat`.
-pub fn ingest_pdf(_bytes: &[u8]) -> Result<Source, CompilerError> {
-    Err(CompilerError::UnsupportedFormat(
-        "PDF ingestion is not implemented yet; convert to text/Markdown/HTML first".to_string(),
-    ))
+/// Extracts text per page via `pdf-extract` (pure Rust, no system PDF
+/// library), joins pages with a block separator, and runs the result
+/// through the same paragraph splitter as the other adapters.
+///
+/// This is plain-text extraction, not layout analysis: `pdf-extract`
+/// emits a line per PDF text-showing operation, which often does not line
+/// up with prose paragraph breaks (a wrapped line and a genuine paragraph
+/// break can look identical). Headings are not detected at all — nothing
+/// in extracted PDF text reliably marks one. Encrypted, scanned
+/// (image-only), or malformed PDFs fail with `CompilerError::PdfExtraction`
+/// rather than silently returning empty or garbled text.
+pub fn ingest_pdf(bytes: &[u8]) -> Result<Source, CompilerError> {
+    let pages = pdf_extract::extract_text_from_mem_by_pages(bytes)?;
+    let joined = pages.join("\n\n");
+    let (text, blocks) = split_into_blocks(&joined);
+    Ok(Source { id: source_fingerprint(bytes), format: SourceFormat::Pdf, text, blocks })
 }
 
 fn blank_line_re() -> &'static Regex {
@@ -174,9 +181,73 @@ mod tests {
     }
 
     #[test]
-    fn pdf_adapter_is_explicitly_unsupported() {
-        let err = ingest_pdf(b"%PDF-1.4").unwrap_err();
-        assert!(matches!(err, CompilerError::UnsupportedFormat(_)));
+    fn pdf_adapter_extracts_text_from_a_valid_pdf() {
+        let bytes = build_test_pdf("Data must be retained for 90 days.");
+        let source = ingest_pdf(&bytes).unwrap();
+        assert_eq!(source.format, SourceFormat::Pdf);
+        assert!(source.text.contains("Data must be retained for 90 days."), "got: {:?}", source.text);
+        assert!(!source.blocks.is_empty());
+    }
+
+    #[test]
+    fn pdf_adapter_rejects_garbage_bytes() {
+        let err = ingest_pdf(b"this is not a pdf at all").unwrap_err();
+        assert!(matches!(err, CompilerError::PdfExtraction(_)));
+    }
+
+    /// Builds a minimal single-page PDF containing `text` via `lopdf`,
+    /// adapted from lopdf's own `examples/create.rs`, so the PDF adapter
+    /// test above exercises real PDF parsing rather than a stub.
+    fn build_test_pdf(text: &str) -> Vec<u8> {
+        use lopdf::content::{Content, Operation};
+        use lopdf::{dictionary, Document, Object, Stream};
+
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Helvetica",
+        });
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+
+        let content = Content {
+            operations: vec![
+                Operation::new("BT", vec![]),
+                Operation::new("Tf", vec!["F1".into(), 24.into()]),
+                Operation::new("Td", vec![72.into(), 700.into()]),
+                Operation::new("Tj", vec![Object::string_literal(text)]),
+                Operation::new("ET", vec![]),
+            ],
+        };
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+        });
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => 1,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let mut bytes = Vec::new();
+        doc.save_to(&mut bytes).unwrap();
+        bytes
     }
 
     #[test]

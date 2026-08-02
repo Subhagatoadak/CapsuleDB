@@ -24,10 +24,14 @@ for candidate in &report.candidates {
 
 - **Adapters**: `text`, `markdown` (native `#`..`######` heading
   recognition), `html` (tag stripping, `<h1>`-`<h6>` promoted to `#`
-  headings, entity decoding). `pdf` is explicitly *not* implemented —
-  `ingest_pdf` always returns `CompilerError::UnsupportedFormat` (robust
-  PDF text extraction is a project of its own; better to say so than ship
-  a half-working extractor).
+  headings, entity decoding), and `pdf` (via `pdf-extract`, pure Rust, no
+  system PDF library). PDF extraction is plain-text, not layout analysis:
+  it emits a line per PDF text-showing operation, which does not always
+  line up with real paragraph breaks, and it detects no headings at all
+  (nothing in extracted PDF text reliably marks one). Encrypted,
+  scanned/image-only, or malformed PDFs fail with
+  `CompilerError::PdfExtraction` rather than returning empty or garbled
+  text.
 - **Structure preservation & semantic-boundary detection**: paragraphs and
   headings become `StructuralBlock`s; sentences within non-heading blocks
   become candidate claims, each with an exact byte-span into the source's
@@ -63,7 +67,6 @@ for candidate in &report.candidates {
 
 ## Deliberately out of scope for this MVP
 
-- PDF ingestion.
 - A human review *workflow* (queueing, UI) — the mechanism is
   `capsule-registry`'s `draft -> in_review -> approved -> published`
   lifecycle gate; this crate just always emits `draft`.

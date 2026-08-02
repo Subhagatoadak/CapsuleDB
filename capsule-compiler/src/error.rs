@@ -6,4 +6,6 @@ pub enum CompilerError {
     InvalidUtf8(#[from] std::str::Utf8Error),
     #[error("unsupported source format: {0}")]
     UnsupportedFormat(String),
+    #[error("PDF text extraction failed: {0}")]
+    PdfExtraction(#[from] pdf_extract::OutputError),
 }
