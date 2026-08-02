@@ -382,24 +382,24 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 6 — Epistemic Evaluation Engine
 
-- [ ] Define evaluation contracts inside capsules
-- [ ] Add answer claim decomposition
-- [ ] Map answer claims to supporting capsules
-- [ ] Detect unsupported claims
-- [ ] Detect applicability expansion
-- [ ] Detect inference-to-fact conversion
-- [ ] Detect association-to-causation conversion
-- [ ] Detect confidence-ceiling violations
-- [ ] Detect missing mandatory qualifications
-- [ ] Detect contradiction suppression
-- [ ] Detect evidence multiplication from shared sources
-- [ ] Add deterministic evaluation rules
-- [ ] Add bounded LLM-as-a-judge mode
-- [ ] Add judge-discretion levels
-- [ ] Add evaluation-surface manifests
-- [ ] Add Evaluation Surface Reduction Score
-- [ ] Add Epistemic Fidelity Score
-- [ ] Add Confidence Laundering Risk Score
+- [x] Define evaluation contracts inside capsules (`evaluation_contract`, already part of the KCP 0.1 schema since Phase 0/1)
+- [x] Add answer claim decomposition ([`capsule-evaluator`](capsule-evaluator), reuses `capsule-compiler`'s segmentation)
+- [x] Map answer claims to supporting capsules (explicit `kc://` citation, or lexical overlap split into strong/ambiguous bands)
+- [x] Detect unsupported claims
+- [x] Detect applicability expansion
+- [x] Detect inference-to-fact conversion (reuses `capsule-compiler`'s confidence-laundering detector)
+- [x] Detect association-to-causation conversion
+- [x] Detect confidence-ceiling violations
+- [x] Detect missing mandatory qualifications
+- [x] Detect contradiction suppression
+- [x] Detect evidence multiplication from shared sources
+- [x] Add deterministic evaluation rules (all of the above; they run before anything else)
+- [x] Add bounded LLM-as-a-judge mode (the boundary is real — a judge is only consulted for genuinely ambiguous claims — but no real judge is wired in; `NullJudge` always abstains, see `capsule-evaluator/README.md`)
+- [x] Add judge-discretion levels
+- [x] Add evaluation-surface manifests
+- [x] Add Evaluation Surface Reduction Score
+- [x] Add Epistemic Fidelity Score
+- [x] Add Confidence Laundering Risk Score
 
 ## Phase 7 — Capsule Studio
 
@@ -499,7 +499,7 @@ CapsuleDB/
 
 ## Current status
 
-Phases 0-5 are implemented:
+Phases 0-6 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
@@ -509,11 +509,12 @@ Phases 0-5 are implemented:
 - `capsule-runtime` is the embeddable local runtime: policy enforcement and consumer-specific views on top of the resolver's permission model, a local cache with poll-based revocation propagation, usage telemetry, and Ed25519 signed-content-hash verification.
 - `capsule-api` is a minimal HTTP JSON API built directly on `capsule-runtime`, so policy/views/caching/telemetry apply over the network too. Tested with real HTTP requests, not mocks.
 - `sdk-python` and `sdk-typescript` are dependency-free HTTP clients for `capsule-api`, both smoke-tested end to end against a live server.
-- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, `keygen`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
+- `capsule-evaluator` evaluates an answer against the capsules that back it: claim decomposition, claim-to-capsule mapping (explicit citation or lexical overlap, split into strong/ambiguous bands), seven deterministic detectors, an evaluation-surface manifest, and the three scores from the roadmap. A bounded-judge boundary is real (only ambiguous claims are ever referred) but no LLM judge is wired in — `NullJudge` always abstains.
+- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, `keygen`, `evaluate`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve → evaluate loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
 
 Building all of this surfaced and fixed two real bugs from earlier phases: the content hash originally covered identity fields, making the spec's own cross-logical-ID dedup claim impossible (fixed in Phase 2); and the resolver treated an anonymous request as bypassing permission checks entirely rather than as unprivileged (fixed while building Phase 5, alongside correcting the Phase 0 example capsules and spec wording that had conflated permission *roles* with capability *verbs*).
 
-Phase 6 (Epistemic Evaluation Engine) has not started. See the roadmap below for what's next.
+Phase 7 (Capsule Studio) has not started. See the roadmap below for what's next.
 
 ---
 

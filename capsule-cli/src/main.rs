@@ -1,4 +1,5 @@
 mod compile_cmd;
+mod evaluate_cmd;
 mod registry_cmd;
 mod resolve_cmd;
 
@@ -6,6 +7,7 @@ use anyhow::{bail, Context, Result};
 use capsule_core::{content_hash, is_valid, parse, validate, Capsule, Severity};
 use clap::{Parser, Subcommand};
 use compile_cmd::SourceFormatArg;
+use evaluate_cmd::DiscretionArg;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -109,6 +111,16 @@ enum Command {
         #[arg(long)]
         out_prefix: Option<PathBuf>,
     },
+    /// Evaluate an answer against the capsules that back it.
+    Evaluate {
+        /// Path to a text file containing the answer to evaluate.
+        answer_file: PathBuf,
+        #[arg(long, default_value = "capsuledb.sqlite3")]
+        db: PathBuf,
+        /// How wide an ambiguous-support band gets referred to the judge (a no-op judge in this build).
+        #[arg(long, value_enum, default_value = "low")]
+        discretion: DiscretionArg,
+    },
 }
 
 fn main() -> Result<()> {
@@ -124,6 +136,7 @@ fn main() -> Result<()> {
             resolve_cmd::run(&db, &purpose, domain, about, jurisdiction, as_of, consumer_role, require_sufficient_evidence, plan)
         }
         Command::Keygen { out_prefix } => cmd_keygen(out_prefix.as_deref()),
+        Command::Evaluate { answer_file, db, discretion } => evaluate_cmd::run(&db, &answer_file, discretion),
     }
 }
 

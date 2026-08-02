@@ -188,6 +188,7 @@ dependencies = [
  "anyhow",
  "capsule-compiler",
  "capsule-core",
+ "capsule-evaluator",
  "capsule-registry",
  "capsule-resolver",
  "capsule-runtime",
@@ -222,6 +223,18 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "capsule-evaluator"
+version = "0.1.0"
+dependencies = [
+ "capsule-compiler",
+ "capsule-core",
+ "capsule-registry",
+ "serde",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 

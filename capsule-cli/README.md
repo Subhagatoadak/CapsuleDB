@@ -88,3 +88,20 @@ Generates an Ed25519 keypair for signing capsule content hashes (see
 `capsule-runtime/README.md`). Signing/verification of `.kcap` packages
 with this key is a `capsule-cli` `pack --sign`/`unpack` feature (Phase 9,
 signed publishers).
+
+## Evaluate
+
+```bash
+capsule evaluate answer.txt --db capsules.sqlite3 --discretion low
+```
+
+Decomposes `answer.txt` into claims, maps each to the capsules that
+support it, and runs every deterministic detector: unsupported claims,
+applicability expansion, inference-to-fact / association-to-causation
+(confidence laundering), confidence-ceiling violations, missing
+mandatory qualifications, contradiction suppression, and evidence
+multiplication across shared sources. Prints the evaluation-surface
+manifest and the three scores. `--discretion` widens the ambiguous-
+support band referred to a judge; no real judge is wired in yet (see
+`capsule-evaluator/README.md`), so referred claims always come back
+"Abstain."

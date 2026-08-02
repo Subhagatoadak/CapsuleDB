@@ -1,0 +1,15 @@
+[package]
+name = "capsule-evaluator"
+description = "Deterministic epistemic evaluation of answers against capsule contracts, with a bounded judge plug-point for residual questions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+capsule-core = { path = "../capsule-core" }
+capsule-compiler = { path = "../capsule-compiler" }
+capsule-registry = { path = "../capsule-registry" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
