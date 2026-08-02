@@ -104,6 +104,49 @@ fn pack_refuses_an_invalid_capsule() {
     assert!(!package.exists());
 }
 
+#[test]
+fn registry_register_transition_publish_and_get_round_trip() {
+    let dir = tempdir();
+    let mut draft: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(repo_root().join("examples/capsules/data-retention-90-days.json")).unwrap()).unwrap();
+    draft["lifecycle_state"] = serde_json::Value::String("draft".to_string());
+    let draft_path = dir.join("draft.json");
+    fs::write(&draft_path, serde_json::to_string_pretty(&draft).unwrap()).unwrap();
+
+    let db = dir.join("registry.sqlite3");
+    let logical_id = draft["logical_id"].as_str().unwrap().to_string();
+
+    let run = |args: &[&str]| -> std::process::Output {
+        Command::new(capsule_bin())
+            .arg("registry")
+            .arg("--db")
+            .arg(&db)
+            .args(args)
+            .output()
+            .unwrap()
+    };
+
+    let register = run(&["register", draft_path.to_str().unwrap(), "--actor", "alice"]);
+    assert!(register.status.success(), "{}", String::from_utf8_lossy(&register.stderr));
+
+    let transition = run(&["transition", &logical_id, "1.0.0", "in_review", "--actor", "alice"]);
+    assert!(transition.status.success(), "{}", String::from_utf8_lossy(&transition.stderr));
+
+    let approve = run(&["transition", &logical_id, "1.0.0", "approved", "--actor", "bob"]);
+    assert!(approve.status.success(), "{}", String::from_utf8_lossy(&approve.stderr));
+
+    let publish = run(&["publish", &logical_id, "1.0.0", "--actor", "bob"]);
+    assert!(publish.status.success(), "{}", String::from_utf8_lossy(&publish.stderr));
+
+    let get = run(&["get", &logical_id, "1.0.0"]);
+    assert!(get.status.success());
+    let stdout = String::from_utf8_lossy(&get.stdout);
+    assert!(stdout.contains("Published"));
+
+    let skip_state = run(&["transition", &logical_id, "1.0.0", "draft", "--actor", "alice"]);
+    assert!(!skip_state.status.success());
+}
+
 fn tempdir() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

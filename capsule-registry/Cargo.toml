@@ -1,0 +1,16 @@
+[package]
+name = "capsule-registry"
+description = "Capsule identity, immutable versions, lifecycle, and audit trail for CapsuleDB (embedded SQLite MVP backend)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+capsule-core = { path = "../capsule-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+semver.workspace = true
+rusqlite.workspace = true

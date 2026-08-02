@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "capsule-core",
     "capsule-cli",
+    "capsule-registry",
 ]
 
 [workspace.package]
@@ -23,3 +24,4 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 tar = "0.4"
 flate2 = "1"
+rusqlite = { version = "0.31", features = ["bundled"] }

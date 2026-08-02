@@ -309,20 +309,20 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 2 — Capsule Registry
 
-- [ ] Design the PostgreSQL schema
-- [ ] Implement capsule metadata persistence
-- [ ] Implement immutable version storage
-- [ ] Implement bitemporal validity
-- [ ] Add owners and domain ownership
-- [ ] Add lifecycle status management
-- [ ] Add approval records
-- [ ] Add publication and revocation records
-- [ ] Add content-addressed deduplication
-- [ ] Add capsule dependency records
-- [ ] Add evidence-family tracking
-- [ ] Add audit events
-- [ ] Add registry APIs
-- [ ] Add local SQLite mode
+- [x] Design the PostgreSQL schema ([draft DDL](capsule-registry/postgres-schema.sql))
+- [x] Implement capsule metadata persistence
+- [x] Implement immutable version storage
+- [x] Implement bitemporal validity (`valid_from`/`valid_until` application time + immutable `recorded_at`/`occurred_at` system time)
+- [x] Add owners and domain ownership
+- [x] Add lifecycle status management
+- [x] Add approval records
+- [x] Add publication and revocation records
+- [x] Add content-addressed deduplication (content hash covers the epistemic payload only, so identical claims dedupe across logical IDs)
+- [x] Add capsule dependency records
+- [x] Add evidence-family tracking
+- [x] Add audit events
+- [x] Add registry APIs (Rust crate API; `capsule registry ...` CLI surface — a networked `capsule-api` is still Phase 5)
+- [x] Add local SQLite mode ([`capsule-registry`](capsule-registry), the Phase 2 MVP backend)
 
 ## Phase 3 — Capsule Compiler
 
@@ -499,13 +499,14 @@ CapsuleDB/
 
 ## Current status
 
-Phase 0 (protocol and specification) and Phase 1 (Capsule Core MVP) are implemented:
+Phases 0-2 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
-- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, and `unpack` against the canonical sample capsules in `examples/capsules/`.
+- `capsule-registry` persists capsules in embedded SQLite: immutable versions, an append-only lifecycle/approval/publication/revocation ledger, content-addressed deduplication, dependency and evidence-family tracking, auto-supersession on publish, and an audit trail. A Postgres schema is drafted for a later backend.
+- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>` against the canonical sample capsules in `examples/capsules/`.
 
-Phase 2 (Capsule Registry) has not started. See the roadmap below for what's next.
+Phase 3 (Capsule Compiler) has not started. See the roadmap below for what's next.
 
 ---
 
