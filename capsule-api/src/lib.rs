@@ -24,20 +24,33 @@
 //! - `GET  /health`
 //! - `GET  /capsule?logical_id=...&version=...[&consumer_role=...][&can_read_evidence=true]`
 //! - `GET  /versions?logical_id=...`
+//! - `GET  /history?logical_id=...&version=...`
+//! - `GET  /dependencies?logical_id=...&version=...`
+//! - `GET  /dependents?logical_id=...&version=...`
+//! - `GET  /evidence?source_id=...`
+//! - `GET  /audit[?limit=...]`
 //! - `POST /resolve[?consumer_role=...]` — body: [`capsule_resolver::ResolutionRequest`] JSON
 //! - `POST /register?actor=...` — body: capsule JSON (must be `draft`)
 //! - `POST /transition?logical_id=...&version=...&to=...&actor=...[&reason=...]`
 //! - `POST /publish?logical_id=...&version=...&actor=...`
+//! - `POST /evaluate` — body: `{"answer": "...", "discretion": "none"|"low"|"medium"|"high"}`
+//!
+//! CORS is wide open (`Access-Control-Allow-Origin: *`, all methods/headers)
+//! so a static page like `capsule-studio` can call this API directly from
+//! a browser without a proxy — consistent with this crate having no auth
+//! of its own yet either.
 
 use capsule_core::{parse as parse_capsule, validate, LifecycleState, Severity};
+use capsule_registry::DependencyRecord;
 use capsule_resolver::ResolutionRequest;
 use capsule_runtime::{AccessRequest, Runtime, RuntimeError};
+use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use tiny_http::{Method, Response, StatusCode};
+use tiny_http::{Header, Method, Response, StatusCode};
 
 pub struct Server {
     runtime: Arc<Mutex<Runtime>>,
@@ -76,19 +89,86 @@ impl Server {
         let (path, query) = split_url(request.url());
         let method = request.method().clone();
 
+        if method == Method::Options {
+            let _ = request.respond(cors_preflight_response());
+            return;
+        }
+
         let result = match (&method, path.as_str()) {
             (Method::Get, "/health") => Ok(json_response(200, &json!({ "status": "ok" }))),
             (Method::Get, "/capsule") => self.handle_get_capsule(&query),
             (Method::Get, "/versions") => self.handle_list_versions(&query),
+            (Method::Get, "/history") => self.handle_history(&query),
+            (Method::Get, "/dependencies") => self.handle_dependencies(&query),
+            (Method::Get, "/dependents") => self.handle_dependents(&query),
+            (Method::Get, "/evidence") => self.handle_evidence_family(&query),
+            (Method::Get, "/audit") => self.handle_audit(&query),
             (Method::Post, "/resolve") => self.handle_resolve(&mut request, &query),
             (Method::Post, "/register") => self.handle_register(&mut request, &query),
             (Method::Post, "/transition") => self.handle_transition(&query),
             (Method::Post, "/publish") => self.handle_publish(&query),
+            (Method::Post, "/evaluate") => self.handle_evaluate(&mut request),
             _ => Ok(json_response(404, &json!({ "error": "not found" }))),
         };
 
         let response = result.unwrap_or_else(|e| json_response(500, &json!({ "error": e })));
         let _ = request.respond(response);
+    }
+
+    fn handle_history(&self, query: &HashMap<String, String>) -> Result<Response<std::io::Cursor<Vec<u8>>>, String> {
+        let logical_id = require(query, "logical_id")?;
+        let version = require(query, "version")?;
+        let runtime = self.runtime.lock().unwrap();
+        let events = runtime.registry().history(logical_id, version).map_err(|e| e.to_string())?;
+        let body: Vec<_> = events
+            .into_iter()
+            .map(|e| json!({ "from_state": e.from_state, "to_state": e.to_state, "actor": e.actor, "reason": e.reason, "occurred_at": e.occurred_at }))
+            .collect();
+        Ok(json_response(200, &body))
+    }
+
+    fn handle_dependencies(&self, query: &HashMap<String, String>) -> Result<Response<std::io::Cursor<Vec<u8>>>, String> {
+        let logical_id = require(query, "logical_id")?;
+        let version = require(query, "version")?;
+        let runtime = self.runtime.lock().unwrap();
+        let deps = runtime.registry().dependencies_of(logical_id, version).map_err(|e| e.to_string())?;
+        Ok(json_response(200, &dependency_records_json(&deps)))
+    }
+
+    fn handle_dependents(&self, query: &HashMap<String, String>) -> Result<Response<std::io::Cursor<Vec<u8>>>, String> {
+        let logical_id = require(query, "logical_id")?;
+        let version = require(query, "version")?;
+        let runtime = self.runtime.lock().unwrap();
+        let deps = runtime.registry().dependents_of(logical_id, version).map_err(|e| e.to_string())?;
+        Ok(json_response(200, &dependency_records_json(&deps)))
+    }
+
+    fn handle_evidence_family(&self, query: &HashMap<String, String>) -> Result<Response<std::io::Cursor<Vec<u8>>>, String> {
+        let source_id = require(query, "source_id")?;
+        let runtime = self.runtime.lock().unwrap();
+        let links = runtime.registry().evidence_family(source_id).map_err(|e| e.to_string())?;
+        let body: Vec<_> = links.into_iter().map(|l| json!({ "logical_id": l.logical_id, "version": l.version, "authority": l.authority })).collect();
+        Ok(json_response(200, &body))
+    }
+
+    fn handle_audit(&self, query: &HashMap<String, String>) -> Result<Response<std::io::Cursor<Vec<u8>>>, String> {
+        let limit: u32 = query.get("limit").and_then(|s| s.parse().ok()).unwrap_or(50);
+        let runtime = self.runtime.lock().unwrap();
+        let events = runtime.registry().audit_log(limit).map_err(|e| e.to_string())?;
+        let body: Vec<_> = events
+            .into_iter()
+            .map(|e| json!({ "event_type": e.event_type, "logical_id": e.logical_id, "version": e.version, "actor": e.actor, "detail": e.detail, "occurred_at": e.occurred_at }))
+            .collect();
+        Ok(json_response(200, &body))
+    }
+
+    fn handle_evaluate(&self, request: &mut tiny_http::Request) -> Result<Response<std::io::Cursor<Vec<u8>>>, String> {
+        let body = read_body(request)?;
+        let payload: EvaluateRequestBody = serde_json::from_str(&body).map_err(|e| format!("invalid request body: {e}"))?;
+        let options = capsule_evaluator::EvaluateOptions { discretion: payload.discretion.into(), ..Default::default() };
+        let runtime = self.runtime.lock().unwrap();
+        let report = capsule_evaluator::evaluate(&payload.answer, runtime.registry(), &capsule_evaluator::NullJudge, &options).map_err(|e| e.to_string())?;
+        Ok(json_response(200, &report))
     }
 
     fn handle_get_capsule(&self, query: &HashMap<String, String>) -> Result<Response<std::io::Cursor<Vec<u8>>>, String> {
@@ -131,10 +211,13 @@ impl Server {
         let capsule = parse_capsule(&body).map_err(|e| format!("invalid capsule JSON: {e}"))?;
         let mut runtime = self.runtime.lock().unwrap();
         match runtime.registry_mut().register(&capsule, actor) {
-            Ok(record) => Ok(json_response(
-                200,
-                &json!({ "logical_id": record.logical_id, "version": record.version, "lifecycle_state": record.lifecycle_state, "content_hash": record.content_hash }),
-            )),
+            Ok(record) => {
+                let _ = runtime.poll_updates(); // invalidate any stale cache entry for this logical_id/version
+                Ok(json_response(
+                    200,
+                    &json!({ "logical_id": record.logical_id, "version": record.version, "lifecycle_state": record.lifecycle_state, "content_hash": record.content_hash }),
+                ))
+            }
             Err(e) => Ok(json_response(400, &json!({ "error": e.to_string() }))),
         }
     }
@@ -150,7 +233,10 @@ impl Server {
 
         let mut runtime = self.runtime.lock().unwrap();
         match runtime.registry_mut().transition(logical_id, version, to_state, actor, reason) {
-            Ok(()) => Ok(json_response(200, &json!({ "logical_id": logical_id, "version": version, "lifecycle_state": to_state }))),
+            Ok(()) => {
+                let _ = runtime.poll_updates(); // GET /capsule must reflect the new state immediately, not on the next poll
+                Ok(json_response(200, &json!({ "logical_id": logical_id, "version": version, "lifecycle_state": to_state })))
+            }
             Err(e) => Ok(json_response(400, &json!({ "error": e.to_string() }))),
         }
     }
@@ -161,12 +247,17 @@ impl Server {
         let actor = require(query, "actor")?;
         let mut runtime = self.runtime.lock().unwrap();
         match runtime.registry_mut().publish(logical_id, version, actor) {
-            Ok(outcomes) => Ok(json_response(200, &json!({ "outcomes": outcomes.iter().map(|o| json!({
-                "target_logical_id": o.target_logical_id,
-                "target_version": o.target_version,
-                "applied": o.applied,
-                "note": o.note,
-            })).collect::<Vec<_>>() }))),
+            Ok(outcomes) => {
+                // Also invalidates the cache for any capsule auto-superseded
+                // by this publish, not just this logical_id/version.
+                let _ = runtime.poll_updates();
+                Ok(json_response(200, &json!({ "outcomes": outcomes.iter().map(|o| json!({
+                    "target_logical_id": o.target_logical_id,
+                    "target_version": o.target_version,
+                    "applied": o.applied,
+                    "note": o.note,
+                })).collect::<Vec<_>>() })))
+            }
             Err(e) => Ok(json_response(400, &json!({ "error": e.to_string() }))),
         }
     }
@@ -219,7 +310,51 @@ fn json_response<T: serde::Serialize>(status: u16, body: &T) -> Response<std::io
     let bytes = serde_json::to_vec(body).unwrap_or_else(|_| b"{\"error\":\"failed to serialize response\"}".to_vec());
     Response::from_data(bytes)
         .with_status_code(StatusCode(status))
-        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
+        .with_header(Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
+        .with_header(Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap())
+}
+
+fn cors_preflight_response() -> Response<std::io::Cursor<Vec<u8>>> {
+    Response::from_data(Vec::new())
+        .with_status_code(StatusCode(204))
+        .with_header(Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap())
+        .with_header(Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, OPTIONS"[..]).unwrap())
+        .with_header(Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type"[..]).unwrap())
+}
+
+fn dependency_records_json(records: &[DependencyRecord]) -> Vec<serde_json::Value> {
+    records
+        .iter()
+        .map(|d| json!({ "logical_id": d.logical_id, "version": d.version, "depends_on_logical_id": d.depends_on_logical_id, "depends_on_version": d.depends_on_version, "relation": d.relation }))
+        .collect()
+}
+
+#[derive(Deserialize)]
+struct EvaluateRequestBody {
+    answer: String,
+    #[serde(default)]
+    discretion: DiscretionParam,
+}
+
+#[derive(Deserialize, Default, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+enum DiscretionParam {
+    None,
+    #[default]
+    Low,
+    Medium,
+    High,
+}
+
+impl From<DiscretionParam> for capsule_evaluator::DiscretionLevel {
+    fn from(value: DiscretionParam) -> Self {
+        match value {
+            DiscretionParam::None => capsule_evaluator::DiscretionLevel::None,
+            DiscretionParam::Low => capsule_evaluator::DiscretionLevel::Low,
+            DiscretionParam::Medium => capsule_evaluator::DiscretionLevel::Medium,
+            DiscretionParam::High => capsule_evaluator::DiscretionLevel::High,
+        }
+    }
 }
 
 fn split_url(url: &str) -> (String, HashMap<String, String>) {

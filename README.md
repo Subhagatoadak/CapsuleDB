@@ -403,17 +403,17 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 7 — Capsule Studio
 
-- [ ] Design the capsule inspection interface
-- [ ] Add source-to-capsule lineage viewer
-- [ ] Add evidence viewer
-- [ ] Add confidence and uncertainty viewer
-- [ ] Add contradiction review interface
-- [ ] Add capsule comparison
-- [ ] Add approval workflow
-- [ ] Add dependency impact viewer
-- [ ] Add evaluation report viewer
-- [ ] Add capsule health dashboard
-- [ ] Add role-based access controls
+- [x] Design the capsule inspection interface ([`capsule-studio`](capsule-studio), a single static `index.html`, no build step)
+- [ ] Add source-to-capsule lineage viewer (evidence span/source_id are shown; the compiler's full transformation lineage is not surfaced)
+- [x] Add evidence viewer
+- [x] Add confidence and uncertainty viewer (basis, ceiling bar, rationale)
+- [x] Add contradiction review interface (view-only — no in-UI resolution-status editing yet)
+- [ ] Add capsule comparison (no side-by-side version diff)
+- [x] Add approval workflow (`draft -> in_review -> approved -> published`, plus `deprecated`/`revoked`)
+- [x] Add dependency impact viewer (dependencies/dependents lookups)
+- [x] Add evaluation report viewer (findings, surface manifest, scores from `capsule-evaluator`)
+- [ ] Add capsule health dashboard (that's Phase 8, `capsule-observatory`)
+- [ ] Add role-based access controls (the underlying API enforces per-capsule permissions; Studio itself has no login — a consumer role is just a trusted text field)
 
 ## Phase 8 — Capsule Observatory
 
@@ -499,7 +499,7 @@ CapsuleDB/
 
 ## Current status
 
-Phases 0-6 are implemented:
+Phases 0-7 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
@@ -511,10 +511,11 @@ Phases 0-6 are implemented:
 - `sdk-python` and `sdk-typescript` are dependency-free HTTP clients for `capsule-api`, both smoke-tested end to end against a live server.
 - `capsule-evaluator` evaluates an answer against the capsules that back it: claim decomposition, claim-to-capsule mapping (explicit citation or lexical overlap, split into strong/ambiguous bands), seven deterministic detectors, an evaluation-surface manifest, and the three scores from the roadmap. A bounded-judge boundary is real (only ambiguous claims are ever referred) but no LLM judge is wired in — `NullJudge` always abstains.
 - `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, `keygen`, `evaluate`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve → evaluate loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
+- `capsule-studio` is a single static `index.html` (no build step) driving `capsule-api` from a browser: inspection, evidence/confidence/contradiction viewers, dependency lookups, the approval workflow, resolution, and evaluation reports. Driven end to end in a real headless-Chromium session, which caught and led to fixing a genuine bug — `GET /capsule` was serving a stale cached copy after a transition, because the mutating endpoints wrote to the registry without invalidating `capsule-runtime`'s cache.
 
-Building all of this surfaced and fixed two real bugs from earlier phases: the content hash originally covered identity fields, making the spec's own cross-logical-ID dedup claim impossible (fixed in Phase 2); and the resolver treated an anonymous request as bypassing permission checks entirely rather than as unprivileged (fixed while building Phase 5, alongside correcting the Phase 0 example capsules and spec wording that had conflated permission *roles* with capability *verbs*).
+Building all of this surfaced and fixed three real bugs from earlier phases, each caught by actually exercising the system rather than by inspection: the content hash originally covered identity fields, making the spec's own cross-logical-ID dedup claim impossible (fixed in Phase 2); the resolver treated an anonymous request as bypassing permission checks entirely rather than as unprivileged (fixed while building Phase 5, alongside correcting the Phase 0 example capsules and spec wording that had conflated permission *roles* with capability *verbs*); and `capsule-api`'s mutating routes wrote straight to the registry without invalidating `capsule-runtime`'s cache, so a capsule fetched once would appear stuck at its first-seen lifecycle state forever (found by driving Capsule Studio in a real browser against a live server, fixed in Phase 7).
 
-Phase 7 (Capsule Studio) has not started. See the roadmap below for what's next.
+Phase 8 (Capsule Observatory) has not started. See the roadmap below for what's next.
 
 ---
 

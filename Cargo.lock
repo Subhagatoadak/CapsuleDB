@@ -171,6 +171,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "capsule-core",
+ "capsule-evaluator",
  "capsule-registry",
  "capsule-resolver",
  "capsule-runtime",

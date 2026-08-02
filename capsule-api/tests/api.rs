@@ -155,3 +155,96 @@ fn resolve_endpoint_returns_bundle() {
     assert_eq!(status, 200, "{body:?}");
     assert_eq!(body["capsules"].as_array().unwrap().len(), 1);
 }
+
+#[test]
+fn history_dependencies_and_audit_endpoints_work() {
+    let addr = start_server();
+    let logical_id = "kc://policy/retention/studio-endpoints";
+    let capsule_json = draft_capsule_json(logical_id);
+    let encoded_id = "kc%3A%2F%2Fpolicy%2Fretention%2Fstudio-endpoints";
+
+    http(addr, "POST", "/register?actor=alice", Some(&capsule_json));
+    http(addr, "POST", &format!("/transition?logical_id={encoded_id}&version=1.0.0&to=in_review&actor=alice"), None);
+
+    let (status, body) = http(addr, "GET", &format!("/history?logical_id={encoded_id}&version=1.0.0"), None);
+    assert_eq!(status, 200);
+    assert_eq!(body.as_array().unwrap().len(), 2, "register + one transition");
+
+    let (status, body) = http(addr, "GET", &format!("/dependencies?logical_id={encoded_id}&version=1.0.0"), None);
+    assert_eq!(status, 200);
+    assert!(body.as_array().unwrap().is_empty());
+
+    let (status, body) = http(addr, "GET", "/audit?limit=5", None);
+    assert_eq!(status, 200);
+    assert!(!body.as_array().unwrap().is_empty());
+}
+
+#[test]
+fn evaluate_endpoint_flags_confidence_laundering() {
+    let addr = start_server();
+    let logical_id = "kc://policy/retention/eval-endpoint";
+    let encoded_id = "kc%3A%2F%2Fpolicy%2Fretention%2Feval-endpoint";
+    let capsule_json = format!(
+        r#"{{
+          "schema_version": "kcp/0.1",
+          "logical_id": "{logical_id}",
+          "version": "1.0.0",
+          "capsule_type": "fact",
+          "statement": "Retention is estimated at ninety days.",
+          "epistemic_status": "estimated",
+          "confidence": {{"basis": "statistical_inference", "ceiling": 0.5}},
+          "lifecycle_state": "draft",
+          "governance": {{"owner": "alice", "domain": "policy"}}
+        }}"#
+    );
+
+    http(addr, "POST", "/register?actor=alice", Some(&capsule_json));
+    http(addr, "POST", &format!("/transition?logical_id={encoded_id}&version=1.0.0&to=in_review&actor=alice"), None);
+    http(addr, "POST", &format!("/transition?logical_id={encoded_id}&version=1.0.0&to=approved&actor=alice"), None);
+    http(addr, "POST", &format!("/publish?logical_id={encoded_id}&version=1.0.0&actor=alice"), None);
+
+    let request_body = json!({ "answer": "Retention is observed at ninety days." }).to_string();
+    let (status, body) = http(addr, "POST", "/evaluate", Some(&request_body));
+    assert_eq!(status, 200, "{body:?}");
+    let findings = body["findings"].as_array().unwrap();
+    assert!(findings.iter().any(|f| f["kind"] == "InferenceToFact"), "{findings:?}");
+}
+
+/// Regression: GET /capsule must reflect a transition immediately, not a
+/// stale copy served from capsule-runtime's cache. Found via manual
+/// Capsule Studio testing — register/transition/publish write straight
+/// to the registry, so without invalidating the cache afterward, a
+/// capsule fetched once (populating the cache) would appear stuck at
+/// its first-seen lifecycle state forever.
+#[test]
+fn get_capsule_reflects_transitions_immediately_not_a_stale_cache_entry() {
+    let addr = start_server();
+    let logical_id = "kc://policy/retention/cache-staleness";
+    let encoded_id = "kc%3A%2F%2Fpolicy%2Fretention%2Fcache-staleness";
+    let capsule_json = draft_capsule_json(logical_id);
+
+    http(addr, "POST", "/register?actor=alice", Some(&capsule_json));
+
+    // populate the cache while still draft
+    let (_, body) = http(addr, "GET", &format!("/capsule?logical_id={encoded_id}&version=1.0.0"), None);
+    assert_eq!(body["lifecycle_state"], "draft");
+
+    http(addr, "POST", &format!("/transition?logical_id={encoded_id}&version=1.0.0&to=in_review&actor=alice"), None);
+    http(addr, "POST", &format!("/transition?logical_id={encoded_id}&version=1.0.0&to=approved&actor=alice"), None);
+    http(addr, "POST", &format!("/publish?logical_id={encoded_id}&version=1.0.0&actor=alice"), None);
+
+    let (_, body) = http(addr, "GET", &format!("/capsule?logical_id={encoded_id}&version=1.0.0"), None);
+    assert_eq!(body["lifecycle_state"], "published", "GET /capsule served a stale cached copy");
+}
+
+#[test]
+fn options_request_gets_cors_preflight_response() {
+    let addr = start_server();
+    let mut stream = TcpStream::connect(addr).unwrap();
+    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    stream.write_all(b"OPTIONS /capsule HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n").unwrap();
+    let mut raw = String::new();
+    stream.read_to_string(&mut raw).unwrap();
+    assert!(raw.starts_with("HTTP/1.1 204"), "{raw}");
+    assert!(raw.contains("Access-Control-Allow-Origin: *"));
+}

@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Capsule Studio</title>
+<style>
+  :root {
+    --bg: #0f1216;
+    --panel: #171b21;
+    --border: #2a3038;
+    --text: #e6e9ee;
+    --muted: #9aa4b2;
+    --accent: #5aa9ff;
+    --ok: #4caf7d;
+    --warn: #e0a53f;
+    --danger: #e0605a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; margin: 0; white-space: nowrap; }
+  header input {
+    flex: 1;
+    min-width: 220px;
+  }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px 20px 60px;
+  }
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  nav.tabs button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 8px 14px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: 13px;
+  }
+  nav.tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  section.tab { display: none; }
+  section.tab.active { display: block; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
+  .row > * { flex: 1; min-width: 140px; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
+  input, select, textarea {
+    width: 100%;
+    background: #0d1013;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  textarea { font-family: "SF Mono", Menlo, monospace; min-height: 100px; resize: vertical; }
+  button.action {
+    background: var(--accent);
+    color: #04121f;
+    border: none;
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    flex: 0 0 auto;
+  }
+  button.action.secondary { background: #2a3038; color: var(--text); }
+  button.action:disabled { opacity: 0.5; cursor: default; }
+  button.action:hover:not(:disabled) { filter: brightness(1.1); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge.draft, .badge.in_review { background: #3a3220; color: var(--warn); }
+  .badge.approved, .badge.published { background: #1e3a2c; color: var(--ok); }
+  .badge.deprecated, .badge.superseded, .badge.revoked { background: #3a2020; color: var(--danger); }
+  .badge.unresolved { background: #3a2020; color: var(--danger); }
+  .badge.resolved, .badge.acknowledged { background: #1e3a2c; color: var(--ok); }
+  .kv { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; margin-bottom: 12px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-word; }
+  .ceiling-bar { background: #0d1013; border-radius: 4px; height: 8px; overflow: hidden; margin-top: 4px; }
+  .ceiling-bar > div { background: var(--accent); height: 100%; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .muted { color: var(--muted); }
+  pre.err { background: #2a1414; border: 1px solid #4a2020; color: #ffb3ab; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }
+  .list-item { border-bottom: 1px solid var(--border); padding: 8px 0; }
+  .list-item:last-child { border-bottom: none; }
+  .findings .list-item { display: flex; gap: 8px; align-items: baseline; }
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .score { background: #0d1013; border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+  .score .value { font-size: 22px; font-weight: 700; }
+  .score .label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  code.pill { background: #0d1013; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Capsule Studio</h1>
+  <input id="api-base" type="text" value="http://127.0.0.1:8089" spellcheck="false" />
+</header>
+
+<main>
+  <nav class="tabs">
+    <button data-tab="inspect" class="active">Inspect</button>
+    <button data-tab="register">Register &amp; Approve</button>
+    <button data-tab="resolve">Resolve</button>
+    <button data-tab="evaluate">Evaluate</button>
+    <button data-tab="audit">Audit</button>
+  </nav>
+
+  <!-- ===================== INSPECT ===================== -->
+  <section class="tab active" id="tab-inspect">
+    <div class="panel">
+      <h2>Fetch a capsule</h2>
+      <div class="row">
+        <div><label>Logical ID</label><input id="ins-logical-id" placeholder="kc://policy/retention/x" /></div>
+        <div><label>Version</label><input id="ins-version" placeholder="1.0.0" /></div>
+        <div><label>Consumer role (optional)</label><input id="ins-role" /></div>
+      </div>
+      <div class="row">
+        <label style="flex:0 0 auto; display:flex; align-items:center; gap:6px; margin:0;"><input type="checkbox" id="ins-evidence" style="width:auto;" /> can_read_evidence</label>
+        <button class="action" id="ins-fetch">Fetch</button>
+        <button class="action secondary" id="ins-versions">List versions</button>
+        <button class="action secondary" id="ins-history">History</button>
+        <button class="action secondary" id="ins-deps">Dependencies</button>
+        <button class="action secondary" id="ins-dependents">Dependents</button>
+      </div>
+    </div>
+
+    <div id="ins-error"></div>
+    <div id="ins-result"></div>
+
+    <div class="panel" id="ins-transition-panel" style="display:none;">
+      <h2>Lifecycle transition</h2>
+      <div class="row">
+        <div><label>Actor</label><input id="ins-actor" placeholder="you" /></div>
+        <div><label>Reason (optional)</label><input id="ins-reason" /></div>
+      </div>
+      <div class="row">
+        <button class="action secondary" data-to="in_review">&rarr; in_review</button>
+        <button class="action secondary" data-to="approved">&rarr; approved</button>
+        <button class="action" data-to="published">Publish</button>
+        <button class="action secondary" data-to="deprecated">&rarr; deprecated</button>
+        <button class="action secondary" data-to="revoked">&rarr; revoked</button>
+      </div>
+      <div id="ins-transition-result"></div>
+    </div>
+  </section>
+
+  <!-- ===================== REGISTER ===================== -->
+  <section class="tab" id="tab-register">
+    <div class="panel">
+      <h2>Register a draft capsule</h2>
+      <div class="row"><div><label>Actor</label><input id="reg-actor" placeholder="you" /></div></div>
+      <label>Capsule JSON (must be lifecycle_state: "draft")</label>
+      <textarea id="reg-json" placeholder='{"schema_version": "kcp/0.1", ...}'></textarea>
+      <div class="row" style="margin-top:8px;"><button class="action" id="reg-submit">Register</button></div>
+      <div id="reg-result"></div>
+    </div>
+  </section>
+
+  <!-- ===================== RESOLVE ===================== -->
+  <section class="tab" id="tab-resolve">
+    <div class="panel">
+      <h2>Resolve a request</h2>
+      <div class="row">
+        <div><label>Purpose</label><input id="res-purpose" placeholder="privacy review" /></div>
+        <div><label>Domain</label><input id="res-domain" /></div>
+        <div><label>About (keyword)</label><input id="res-about" /></div>
+      </div>
+      <div class="row">
+        <div><label>Jurisdiction</label><input id="res-jurisdiction" /></div>
+        <div><label>Consumer role</label><input id="res-role" /></div>
+        <div><label>As of (YYYY-MM-DD)</label><input id="res-asof" /></div>
+      </div>
+      <button class="action" id="res-submit">Resolve</button>
+    </div>
+    <div id="res-result"></div>
+  </section>
+
+  <!-- ===================== EVALUATE ===================== -->
+  <section class="tab" id="tab-evaluate">
+    <div class="panel">
+      <h2>Evaluate an answer</h2>
+      <textarea id="eval-answer" placeholder="Paste the answer text to evaluate against registered capsules..."></textarea>
+      <div class="row" style="margin-top:8px;">
+        <div><label>Judge discretion</label>
+          <select id="eval-discretion">
+            <option value="none">none</option>
+            <option value="low" selected>low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </div>
+        <button class="action" id="eval-submit">Evaluate</button>
+      </div>
+    </div>
+    <div id="eval-result"></div>
+  </section>
+
+  <!-- ===================== AUDIT ===================== -->
+  <section class="tab" id="tab-audit">
+    <div class="panel">
+      <h2>Recent audit events</h2>
+      <div class="row">
+        <div><label>Limit</label><input id="audit-limit" value="30" /></div>
+        <button class="action" id="audit-submit">Load</button>
+      </div>
+    </div>
+    <div id="audit-result"></div>
+  </section>
+</main>
+
+<script>
+'use strict';
+
+const apiBase = () => document.getElementById('api-base').value.replace(/\/$/, '');
+
+function el(tag, attrs, children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'text') node.textContent = v;
+    else if (k === 'html') node.innerHTML = v;
+    else node.setAttribute(k, v);
+  }
+  for (const child of children || []) node.appendChild(child);
+  return node;
+}
+
+function badge(text, cls) {
+  return el('span', { class: `badge ${cls || (text || '').toLowerCase()}`, text: text || '' });
+}
+
+async function api(method, path, body) {
+  const response = await fetch(apiBase() + path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await response.text();
+  const parsed = text.length ? JSON.parse(text) : null;
+  if (!response.ok) {
+    const err = new Error((parsed && parsed.error) || `HTTP ${response.status}`);
+    err.status = response.status;
+    err.body = parsed;
+    throw err;
+  }
+  return parsed;
+}
+
+function showError(container, error) {
+  container.innerHTML = '';
+  container.appendChild(el('pre', { class: 'err', text: `${error.status ? error.status + ' ' : ''}${error.message}` }));
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('nav.tabs button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('section.tab').forEach((s) => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- inspect ----------
+let currentCapsule = { logicalId: null, version: null };
+
+function renderCapsule(capsule) {
+  const wrap = el('div', { class: 'panel' });
+  wrap.appendChild(el('h2', { text: 'Capsule' }));
+
+  const kv = el('dl', { class: 'kv' });
+  const addKv = (k, node) => {
+    kv.appendChild(el('dt', { text: k }));
+    const dd = el('dd', {});
+    if (typeof node === 'string') dd.textContent = node; else dd.appendChild(node);
+    kv.appendChild(dd);
+  };
+  addKv('logical_id', capsule.logical_id);
+  addKv('version', capsule.version);
+  addKv('capsule_type', capsule.capsule_type);
+  addKv('lifecycle_state', badge(capsule.lifecycle_state));
+  addKv('epistemic_status', capsule.epistemic_status);
+  addKv('content_hash', el('code', { class: 'pill', text: capsule.content_hash || '(unset)' }));
+  wrap.appendChild(kv);
+
+  wrap.appendChild(el('div', { text: capsule.statement, style: 'margin-bottom:12px; font-size:14px;' }));
+
+  const conf = capsule.confidence || {};
+  const confBox = el('div', { style: 'margin-bottom:12px;' });
+  confBox.appendChild(el('div', { text: `confidence: ${conf.basis} — ceiling ${(conf.ceiling ?? 0).toFixed(2)}`, class: 'muted' }));
+  const bar = el('div', { class: 'ceiling-bar' });
+  bar.appendChild(el('div', { style: `width:${Math.round((conf.ceiling || 0) * 100)}%` }));
+  confBox.appendChild(bar);
+  if (conf.rationale) confBox.appendChild(el('div', { text: conf.rationale, class: 'muted', style: 'margin-top:4px; font-size:12px;' }));
+  wrap.appendChild(confBox);
+
+  if (capsule.evidence && capsule.evidence.length) {
+    wrap.appendChild(el('h2', { text: 'Evidence' }));
+    for (const e of capsule.evidence) {
+      const item = el('div', { class: 'list-item' });
+      item.appendChild(el('div', { html: `<strong>${e.source_id}</strong> ${badge(e.authority)}` }));
+      if (e.excerpt) item.appendChild(el('div', { text: e.excerpt, class: 'muted', style: 'margin-top:4px;' }));
+      if (e.span) item.appendChild(el('div', { text: e.span, class: 'muted', style: 'font-size:11px;' }));
+      wrap.appendChild(item);
+    }
+  }
+
+  if (capsule.applicability) {
+    const a = capsule.applicability;
+    wrap.appendChild(el('h2', { text: 'Applicability' }));
+    const p = el('div', { class: 'muted' });
+    p.textContent = `jurisdictions: ${(a.jurisdictions || []).join(', ') || 'global'} · valid_from: ${a.valid_from || '-'} · valid_until: ${a.valid_until || '-'}`;
+    wrap.appendChild(p);
+    if (a.conditions && a.conditions.length) wrap.appendChild(el('div', { text: 'conditions: ' + a.conditions.join('; '), style: 'margin-top:4px;' }));
+    if (a.exclusions && a.exclusions.length) wrap.appendChild(el('div', { text: 'exclusions: ' + a.exclusions.join('; '), style: 'margin-top:4px;' }));
+  }
+
+  if (capsule.contradictions && capsule.contradictions.length) {
+    wrap.appendChild(el('h2', { text: 'Contradictions' }));
+    for (const c of capsule.contradictions) {
+      const item = el('div', { class: 'list-item' });
+      item.appendChild(el('div', { html: `${badge(c.resolution_status)} vs <code class="pill">${c.capsule_id}</code>` }));
+      item.appendChild(el('div', { text: c.description, style: 'margin-top:4px;' }));
+      wrap.appendChild(item);
+    }
+  }
+
+  if (capsule.dependencies && capsule.dependencies.length) {
+    wrap.appendChild(el('h2', { text: 'Dependencies' }));
+    for (const d of capsule.dependencies) {
+      wrap.appendChild(el('div', { html: `<code class="pill">${d.relation}</code> ${d.capsule_id}`, class: 'list-item' }));
+    }
+  }
+
+  if (capsule.evaluation_contract) {
+    const ec = capsule.evaluation_contract;
+    wrap.appendChild(el('h2', { text: 'Evaluation contract' }));
+    if (ec.mandatory_qualifications && ec.mandatory_qualifications.length)
+      wrap.appendChild(el('div', { text: 'mandatory qualifications: ' + ec.mandatory_qualifications.join('; ') }));
+    if (ec.prohibited_overclaims && ec.prohibited_overclaims.length)
+      wrap.appendChild(el('div', { text: 'prohibited overclaims: ' + ec.prohibited_overclaims.join('; '), style: 'margin-top:4px;' }));
+  }
+
+  const gov = capsule.governance || {};
+  wrap.appendChild(el('h2', { text: 'Governance' }));
+  wrap.appendChild(el('div', { text: `owner: ${gov.owner} · domain: ${gov.domain} · permissions: ${(gov.permissions || []).join(', ') || 'public'}` }));
+
+  return wrap;
+}
+
+async function inspectFetch() {
+  const logicalId = document.getElementById('ins-logical-id').value.trim();
+  const version = document.getElementById('ins-version').value.trim();
+  const role = document.getElementById('ins-role').value.trim();
+  const canReadEvidence = document.getElementById('ins-evidence').checked;
+  const errBox = document.getElementById('ins-error');
+  const result = document.getElementById('ins-result');
+  errBox.innerHTML = '';
+  result.innerHTML = '';
+  if (!logicalId || !version) { showError(errBox, new Error('logical_id and version are required')); return; }
+
+  const params = new URLSearchParams({ logical_id: logicalId, version });
+  if (role) params.set('consumer_role', role);
+  if (canReadEvidence) params.set('can_read_evidence', 'true');
+
+  try {
+    const capsule = await api('GET', '/capsule?' + params.toString());
+    currentCapsule = { logicalId, version };
+    result.appendChild(renderCapsule(capsule));
+    document.getElementById('ins-transition-panel').style.display = '';
+  } catch (e) {
+    showError(errBox, e);
+  }
+}
+
+function renderTable(headers, rows) {
+  const table = el('table', {});
+  const thead = el('tr', {});
+  headers.forEach((h) => thead.appendChild(el('th', { text: h })));
+  table.appendChild(el('thead', {}, [thead]));
+  const tbody = el('tbody', {});
+  rows.forEach((row) => {
+    const tr = el('tr', {});
+    row.forEach((cell) => {
+      const td = el('td', {});
+      if (typeof cell === 'string') td.textContent = cell; else td.appendChild(cell);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  return table;
+}
+
+document.getElementById('ins-fetch').addEventListener('click', inspectFetch);
+
+document.getElementById('ins-versions').addEventListener('click', async () => {
+  const logicalId = document.getElementById('ins-logical-id').value.trim();
+  const errBox = document.getElementById('ins-error');
+  const result = document.getElementById('ins-result');
+  errBox.innerHTML = ''; result.innerHTML = '';
+  try {
+    const versions = await api('GET', '/versions?' + new URLSearchParams({ logical_id: logicalId }));
+    const panel = el('div', { class: 'panel' }, [el('h2', { text: 'Versions' })]);
+    panel.appendChild(renderTable(['version', 'lifecycle_state', 'content_hash'], versions.map((v) => [v.version, badge(v.lifecycle_state), el('code', { class: 'pill', text: (v.content_hash || '').slice(0, 20) + '…' })])));
+    result.appendChild(panel);
+  } catch (e) { showError(errBox, e); }
+});
+
+document.getElementById('ins-history').addEventListener('click', async () => {
+  const logicalId = document.getElementById('ins-logical-id').value.trim();
+  const version = document.getElementById('ins-version').value.trim();
+  const errBox = document.getElementById('ins-error');
+  const result = document.getElementById('ins-result');
+  errBox.innerHTML = ''; result.innerHTML = '';
+  try {
+    const events = await api('GET', '/history?' + new URLSearchParams({ logical_id: logicalId, version }));
+    const panel = el('div', { class: 'panel' }, [el('h2', { text: 'Lifecycle history' })]);
+    panel.appendChild(renderTable(['from', 'to', 'actor', 'reason', 'occurred_at'], events.map((e) => [e.from_state || '-', badge(e.to_state), e.actor, e.reason || '-', e.occurred_at])));
+    result.appendChild(panel);
+  } catch (e) { showError(errBox, e); }
+});
+
+function loadDeps(endpoint, title) {
+  return async () => {
+    const logicalId = document.getElementById('ins-logical-id').value.trim();
+    const version = document.getElementById('ins-version').value.trim();
+    const errBox = document.getElementById('ins-error');
+    const result = document.getElementById('ins-result');
+    errBox.innerHTML = ''; result.innerHTML = '';
+    try {
+      const deps = await api('GET', `/${endpoint}?` + new URLSearchParams({ logical_id: logicalId, version }));
+      const panel = el('div', { class: 'panel' }, [el('h2', { text: title })]);
+      if (!deps.length) panel.appendChild(el('div', { text: 'none', class: 'muted' }));
+      panel.appendChild(renderTable(['logical_id', 'relation', 'depends_on'], deps.map((d) => [
+        endpoint === 'dependents' ? `${d.logical_id}@${d.version}` : d.logical_id,
+        badge(d.relation),
+        endpoint === 'dependents' ? '(this capsule)' : `${d.depends_on_logical_id}${d.depends_on_version ? '@' + d.depends_on_version : ''}`,
+      ])));
+      result.appendChild(panel);
+    } catch (e) { showError(errBox, e); }
+  };
+}
+document.getElementById('ins-deps').addEventListener('click', loadDeps('dependencies', 'Dependencies (what this depends on)'));
+document.getElementById('ins-dependents').addEventListener('click', loadDeps('dependents', 'Dependents (what depends on this)'));
+
+document.querySelectorAll('#ins-transition-panel [data-to]').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const resultBox = document.getElementById('ins-transition-result');
+    resultBox.innerHTML = '';
+    if (!currentCapsule.logicalId) { showError(resultBox, new Error('fetch a capsule first')); return; }
+    const actor = document.getElementById('ins-actor').value.trim();
+    const reason = document.getElementById('ins-reason').value.trim();
+    if (!actor) { showError(resultBox, new Error('actor is required')); return; }
+    const to = btn.dataset.to;
+    const params = new URLSearchParams({ logical_id: currentCapsule.logicalId, version: currentCapsule.version, actor });
+    if (reason) params.set('reason', reason);
+    try {
+      let outcome;
+      if (to === 'published') {
+        outcome = await api('POST', '/publish?' + params.toString());
+      } else {
+        params.set('to', to);
+        outcome = await api('POST', '/transition?' + params.toString());
+      }
+      resultBox.innerHTML = '';
+      resultBox.appendChild(el('pre', { text: JSON.stringify(outcome, null, 2), class: 'muted', style: 'white-space:pre-wrap;' }));
+      inspectFetch();
+    } catch (e) { showError(resultBox, e); }
+  });
+});
+
+// ---------- register ----------
+document.getElementById('reg-submit').addEventListener('click', async () => {
+  const result = document.getElementById('reg-result');
+  result.innerHTML = '';
+  const actor = document.getElementById('reg-actor').value.trim();
+  let capsule;
+  try {
+    capsule = JSON.parse(document.getElementById('reg-json').value);
+  } catch (e) {
+    showError(result, new Error('invalid JSON: ' + e.message));
+    return;
+  }
+  try {
+    const record = await api('POST', '/register?' + new URLSearchParams({ actor }), capsule);
+    result.appendChild(el('pre', { text: JSON.stringify(record, null, 2), class: 'muted', style: 'white-space:pre-wrap;' }));
+  } catch (e) { showError(result, e); }
+});
+
+// ---------- resolve ----------
+document.getElementById('res-submit').addEventListener('click', async () => {
+  const result = document.getElementById('res-result');
+  result.innerHTML = '';
+  const body = { purpose: document.getElementById('res-purpose').value.trim() || 'unspecified' };
+  const domain = document.getElementById('res-domain').value.trim();
+  const about = document.getElementById('res-about').value.trim();
+  const jurisdiction = document.getElementById('res-jurisdiction').value.trim();
+  const role = document.getElementById('res-role').value.trim();
+  const asOf = document.getElementById('res-asof').value.trim();
+  if (domain) body.domain = domain;
+  if (about) body.about = about;
+  if (jurisdiction) body.jurisdiction = jurisdiction;
+  if (asOf) body.as_of = asOf;
+
+  try {
+    const params = role ? '?' + new URLSearchParams({ consumer_role: role }) : '';
+    const bundle = await api('POST', '/resolve' + params, body);
+    const panel = el('div', { class: 'panel' }, [el('h2', { text: `Resolved (${bundle.capsules.length})` })]);
+    bundle.capsules.forEach((c) => {
+      const item = el('div', { class: 'list-item' });
+      item.appendChild(el('div', { html: `<code class="pill">${c.included_as}</code> <strong>${c.logical_id}@${c.version}</strong> ${badge(c.lifecycle_state)} ceiling=${c.effective_confidence_ceiling.toFixed(2)}` }));
+      item.appendChild(el('div', { text: c.capsule.statement, class: 'muted', style: 'margin-top:4px;' }));
+      panel.appendChild(item);
+    });
+    result.appendChild(panel);
+
+    if (bundle.contradictions.length) {
+      const cp = el('div', { class: 'panel' }, [el('h2', { text: 'Contradictions' })]);
+      bundle.contradictions.forEach((c) => cp.appendChild(el('div', { text: `${c.declaring_logical_id}@${c.declaring_version} vs ${c.target_capsule_id}: ${c.description}`, class: 'list-item' })));
+      result.appendChild(cp);
+    }
+    if (bundle.gaps.length) {
+      const gp = el('div', { class: 'panel' }, [el('h2', { text: 'Known gaps' })]);
+      bundle.gaps.forEach((g) => gp.appendChild(el('div', { text: `${g.logical_id}${g.version ? '@' + g.version : ''}: ${g.reason}`, class: 'list-item' })));
+      result.appendChild(gp);
+    }
+    const pp = el('div', { class: 'panel' }, [el('h2', { text: 'Plan' })]);
+    pp.appendChild(renderTable(['logical_id', 'version', 'decision', 'reason'], bundle.plan.map((s) => [s.logical_id, s.version || '*', badge(s.decision), s.reason])));
+    result.appendChild(pp);
+  } catch (e) { showError(result, e); }
+});
+
+// ---------- evaluate ----------
+document.getElementById('eval-submit').addEventListener('click', async () => {
+  const result = document.getElementById('eval-result');
+  result.innerHTML = '';
+  const answer = document.getElementById('eval-answer').value;
+  const discretion = document.getElementById('eval-discretion').value;
+  try {
+    const report = await api('POST', '/evaluate', { answer, discretion });
+    const scorePanel = el('div', { class: 'panel' }, [el('h2', { text: 'Scores' })]);
+    const grid = el('div', { class: 'score-grid' });
+    const scoreBox = (label, value) => el('div', { class: 'score' }, [el('div', { class: 'value', text: value.toFixed(2) }), el('div', { class: 'label', text: label })]);
+    grid.appendChild(scoreBox('Evaluation surface reduction', report.scores.evaluation_surface_reduction));
+    grid.appendChild(scoreBox('Epistemic fidelity', report.scores.epistemic_fidelity));
+    grid.appendChild(scoreBox('Confidence laundering risk', report.scores.confidence_laundering_risk));
+    scorePanel.appendChild(grid);
+    scorePanel.appendChild(el('div', { class: 'muted', text: `claims: ${report.surface.total_claims} · strongly supported: ${report.surface.claims_strongly_supported} · referred to judge: ${report.surface.claims_ambiguous_referred_to_judge} · unsupported: ${report.surface.claims_unsupported}` }));
+    result.appendChild(scorePanel);
+
+    const fp = el('div', { class: 'panel findings' }, [el('h2', { text: `Findings (${report.findings.length})` })]);
+    if (!report.findings.length) fp.appendChild(el('div', { text: 'none', class: 'muted' }));
+    report.findings.forEach((f) => {
+      const item = el('div', { class: 'list-item' });
+      item.appendChild(el('span', { class: 'badge', text: f.kind }));
+      item.appendChild(el('span', { text: f.message }));
+      fp.appendChild(item);
+    });
+    result.appendChild(fp);
+
+    if (report.judge_verdicts.length) {
+      const jp = el('div', { class: 'panel' }, [el('h2', { text: 'Judge verdicts (NullJudge — no LLM wired in, always abstains)' })]);
+      report.judge_verdicts.forEach(([idx, verdict]) => jp.appendChild(el('div', { text: `claim #${idx}: ${JSON.stringify(verdict)}`, class: 'list-item' })));
+      result.appendChild(jp);
+    }
+  } catch (e) { showError(result, e); }
+});
+
+// ---------- audit ----------
+document.getElementById('audit-submit').addEventListener('click', async () => {
+  const result = document.getElementById('audit-result');
+  result.innerHTML = '';
+  const limit = document.getElementById('audit-limit').value.trim() || '30';
+  try {
+    const events = await api('GET', '/audit?' + new URLSearchParams({ limit }));
+    const panel = el('div', { class: 'panel' }, [el('h2', { text: `Recent events (${events.length})` })]);
+    panel.appendChild(renderTable(['occurred_at', 'event_type', 'logical_id', 'version', 'actor'], events.map((e) => [e.occurred_at, e.event_type, e.logical_id || '-', e.version || '-', e.actor])));
+    result.appendChild(panel);
+  } catch (e) { showError(result, e); }
+});
+</script>
+</body>
+</html>
