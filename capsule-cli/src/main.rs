@@ -1,5 +1,6 @@
 mod compile_cmd;
 mod registry_cmd;
+mod resolve_cmd;
 
 use anyhow::{bail, Context, Result};
 use capsule_core::{content_hash, is_valid, parse, validate, Capsule, Severity};
@@ -78,6 +79,30 @@ enum Command {
         #[arg(long, default_value = "draft-capsules")]
         out_dir: PathBuf,
     },
+    /// Resolve the applicable capsule set for a request against a registry.
+    Resolve {
+        /// Path to the registry's SQLite database.
+        #[arg(long, default_value = "capsuledb.sqlite3")]
+        db: PathBuf,
+        purpose: String,
+        #[arg(long)]
+        domain: Option<String>,
+        #[arg(long)]
+        about: Option<String>,
+        #[arg(long)]
+        jurisdiction: Option<String>,
+        /// Resolve as of this date (YYYY-MM-DD); defaults to today.
+        #[arg(long)]
+        as_of: Option<String>,
+        #[arg(long)]
+        consumer_role: Option<String>,
+        /// Exclude candidates whose evidence is entirely unverified.
+        #[arg(long)]
+        require_sufficient_evidence: bool,
+        /// Print the full inclusion/exclusion decision plan.
+        #[arg(long)]
+        plan: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -89,6 +114,9 @@ fn main() -> Result<()> {
         Command::Unpack { package, output } => cmd_unpack(&package, &output),
         Command::Registry { db, action } => registry_cmd::run(&db, action),
         Command::Compile { source, format, domain, topic, owner, out_dir } => compile_cmd::run(&source, format, &domain, &topic, &owner, &out_dir),
+        Command::Resolve { db, purpose, domain, about, jurisdiction, as_of, consumer_role, require_sufficient_evidence, plan } => {
+            resolve_cmd::run(&db, &purpose, domain, about, jurisdiction, as_of, consumer_role, require_sufficient_evidence, plan)
+        }
     }
 }
 

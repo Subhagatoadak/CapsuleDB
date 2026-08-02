@@ -260,6 +260,16 @@ impl Registry {
         Ok(Some(self.build_record(logical_id, version)?))
     }
 
+    /// Every distinct logical ID with at least one registered version.
+    /// The naive scan `capsule-resolver` uses as its lexical discovery
+    /// index — there is no separate search infrastructure in the Phase 2
+    /// MVP.
+    pub fn list_logical_ids(&self) -> Result<Vec<String>, RegistryError> {
+        let mut stmt = self.conn.prepare("SELECT DISTINCT logical_id FROM capsule_versions ORDER BY logical_id")?;
+        let ids = stmt.query_map([], |row| row.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(ids)
+    }
+
     /// All registered versions of a logical ID, newest SemVer first.
     pub fn list_versions(&self, logical_id: &str) -> Result<Vec<CapsuleRecord>, RegistryError> {
         let mut stmt = self.conn.prepare("SELECT version FROM capsule_versions WHERE logical_id = ?1")?;

@@ -1,0 +1,15 @@
+[package]
+name = "capsule-resolver"
+description = "Resolves the applicable capsule set for a request: filtering, dependency completion, contradiction bundling, and inspectable/replayable resolution plans"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+capsule-core = { path = "../capsule-core" }
+capsule-registry = { path = "../capsule-registry" }
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+thiserror.workspace = true

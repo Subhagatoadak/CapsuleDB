@@ -346,23 +346,23 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 4 — Capsule Resolver
 
-- [ ] Define the resolution request contract
-- [ ] Add purpose resolution
-- [ ] Add identity and permission filtering
-- [ ] Add capsule-type planning
-- [ ] Add temporal version resolution
-- [ ] Add applicability evaluation
-- [ ] Add authority ordering
-- [ ] Add evidence-sufficiency gates
-- [ ] Add dependency completion
-- [ ] Add contradiction bundles
-- [ ] Add known-gap reporting
-- [ ] Add lexical discovery index
-- [ ] Add optional semantic discovery index
-- [ ] Add dependency index
-- [ ] Add contradiction index
-- [ ] Generate inspectable resolution plans
-- [ ] Support replayable resolution
+- [x] Define the resolution request contract ([`capsule-resolver/src/types.rs`](capsule-resolver/src/types.rs), matches protocol §5)
+- [ ] Add purpose resolution (`purpose` is accepted and carried through the bundle/plan for record-keeping, but there is no purpose vocabulary yet to filter against — currently just a label)
+- [x] Add identity and permission filtering (consumer role vs. `governance.permissions`)
+- [x] Add capsule-type planning
+- [x] Add temporal version resolution (via `registry.latest_published(id, as_of)`)
+- [x] Add applicability evaluation (jurisdiction here; validity window in the registry's `latest_published`)
+- [x] Add authority ordering
+- [x] Add evidence-sufficiency gates
+- [x] Add dependency completion (`requires`, transitive, cycle-safe, propagates the confidence-ceiling rule from spec §6.3)
+- [x] Add contradiction bundles
+- [x] Add known-gap reporting
+- [x] Add lexical discovery index (substring scan over statements — no separate index infrastructure)
+- [ ] Add optional semantic discovery index (would need an embedding/vector index; out of scope for now)
+- [x] Add dependency index (`capsule-registry`'s `dependency_records` table + indexes, used via `dependencies_of`/`dependents_of`)
+- [x] Add contradiction index (evidence/contradiction lookups against the registry)
+- [x] Generate inspectable resolution plans
+- [x] Support replayable resolution
 
 ## Phase 5 — Capsule Runtime
 
@@ -499,15 +499,16 @@ CapsuleDB/
 
 ## Current status
 
-Phases 0-3 are implemented:
+Phases 0-4 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
 - `capsule-registry` persists capsules in embedded SQLite: immutable versions, an append-only lifecycle/approval/publication/revocation ledger, content-addressed deduplication, dependency and evidence-family tracking, auto-supersession on publish, and an audit trail. A Postgres schema is drafted for a later backend.
 - `capsule-compiler` turns text/Markdown/HTML/PDF sources into draft candidate capsules deterministically: span-bound claim extraction, epistemic-status classification, qualification/exclusion/condition detection, evidence-duplication detection, and immediate `capsule_core::validate` pre-validation — no LLM step yet.
-- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
+- `capsule-resolver` resolves the applicable capsule set for a request: filtering (domain/type/keyword/jurisdiction/permission/evidence-sufficiency), temporal version resolution, authority ordering, transitive `requires` dependency completion with confidence-ceiling propagation, contradiction bundling, known-gap reporting, and an inspectable, replayable resolution plan.
+- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
 
-Phase 4 (Capsule Resolver) has not started. See the roadmap below for what's next.
+Phase 5 (Capsule Runtime) has not started. See the roadmap below for what's next.
 
 ---
 

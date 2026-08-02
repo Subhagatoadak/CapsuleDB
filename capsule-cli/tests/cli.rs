@@ -185,6 +185,36 @@ fn compile_extracts_candidates_and_writes_valid_draft_json() {
     assert!(validate.status.success(), "{}", String::from_utf8_lossy(&validate.stderr));
 }
 
+#[test]
+fn resolve_returns_the_latest_published_matching_capsule() {
+    let dir = tempdir();
+    let mut draft: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(repo_root().join("examples/capsules/data-retention-90-days.json")).unwrap()).unwrap();
+    draft["lifecycle_state"] = serde_json::Value::String("draft".to_string());
+    let draft_path = dir.join("draft.json");
+    fs::write(&draft_path, serde_json::to_string_pretty(&draft).unwrap()).unwrap();
+
+    let db = dir.join("registry.sqlite3");
+    let logical_id = draft["logical_id"].as_str().unwrap().to_string();
+
+    let registry_run = |args: &[&str]| -> std::process::Output {
+        Command::new(capsule_bin()).arg("registry").arg("--db").arg(&db).args(args).output().unwrap()
+    };
+    assert!(registry_run(&["register", draft_path.to_str().unwrap(), "--actor", "alice"]).status.success());
+    assert!(registry_run(&["transition", &logical_id, "1.0.0", "in_review", "--actor", "alice"]).status.success());
+    assert!(registry_run(&["transition", &logical_id, "1.0.0", "approved", "--actor", "alice"]).status.success());
+    assert!(registry_run(&["publish", &logical_id, "1.0.0", "--actor", "alice"]).status.success());
+
+    let resolve = Command::new(capsule_bin())
+        .args(["resolve", "--db", db.to_str().unwrap(), "privacy review", "--domain", "policy", "--about", "retained", "--plan"])
+        .output()
+        .unwrap();
+    assert!(resolve.status.success(), "{}", String::from_utf8_lossy(&resolve.stderr));
+    let stdout = String::from_utf8_lossy(&resolve.stdout);
+    assert!(stdout.contains("resolved 1 capsule(s)"));
+    assert!(stdout.contains(&logical_id));
+}
+
 fn tempdir() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

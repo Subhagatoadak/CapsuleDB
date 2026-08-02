@@ -14,6 +14,7 @@ path = "src/main.rs"
 capsule-core = { path = "../capsule-core" }
 capsule-registry = { path = "../capsule-registry" }
 capsule-compiler = { path = "../capsule-compiler" }
+capsule-resolver = { path = "../capsule-resolver" }
 serde.workspace = true
 serde_json.workspace = true
 clap.workspace = true

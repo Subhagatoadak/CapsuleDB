@@ -59,3 +59,16 @@ detected qualifications/exclusions/conditions, bare `kc://` references
 already run against each candidate — see `capsule-compiler/README.md`.
 A typical next step is `capsule registry register drafts/001.json --actor
 you` once you've reviewed a candidate.
+
+## Resolve
+
+```bash
+capsule resolve "privacy review" --db capsules.sqlite3 --domain policy --about retention --jurisdiction IN --plan
+```
+
+Resolves the applicable capsule set for a request: filters by domain,
+keyword, jurisdiction, capsule type, and consumer role; picks the
+temporally-applicable published version of each match; pulls in
+`requires` dependencies (propagating the confidence-ceiling rule) and any
+contradictions; and — with `--plan` — prints the full inclusion/exclusion
+decision trail. See `capsule-resolver/README.md`.
