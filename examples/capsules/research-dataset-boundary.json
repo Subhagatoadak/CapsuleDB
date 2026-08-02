@@ -1,0 +1,49 @@
+{
+  "schema_version": "kcp/0.1",
+  "logical_id": "kc://policy/data-retention/research-dataset-exclusion",
+  "version": "1.0.0",
+  "capsule_type": "boundary",
+  "statement": "The 90-day (now 180-day) customer data retention rule does not apply to de-identified research datasets approved under the Research Data Exemption process; those datasets follow the separate research data retention schedule.",
+  "epistemic_status": "policy_defined",
+  "confidence": {
+    "basis": "policy_mandate",
+    "ceiling": 0.85,
+    "rationale": "Stated as an explicit carve-out in the research data governance addendum."
+  },
+  "lifecycle_state": "published",
+  "evidence": [
+    {
+      "source_id": "research-data-governance-addendum-v1",
+      "span": "section 2",
+      "excerpt": "De-identified datasets approved under the Research Data Exemption are governed by the research data retention schedule, not the standard customer data retention policy.",
+      "authority": "primary",
+      "retrieved_at": "2026-03-01T09:00:00Z"
+    }
+  ],
+  "applicability": {
+    "jurisdictions": ["IN"],
+    "valid_from": "2026-03-01",
+    "valid_until": null,
+    "conditions": ["dataset has an approved Research Data Exemption on file"],
+    "exclusions": ["datasets that still contain directly identifying fields"]
+  },
+  "contradictions": [],
+  "dependencies": [
+    {
+      "capsule_id": "kc://policy/data-retention/customer-data-90-days",
+      "relation": "refines"
+    }
+  ],
+  "governance": {
+    "owner": "privacy-office",
+    "domain": "policy",
+    "permissions": []
+  },
+  "evaluation_contract": {
+    "mandatory_qualifications": ["only applies to datasets with an approved Research Data Exemption"],
+    "prohibited_overclaims": ["all research data is exempt from retention limits"],
+    "evaluation_rules": [
+      "answers must not extend this exclusion to datasets without a documented exemption"
+    ]
+  }
+}

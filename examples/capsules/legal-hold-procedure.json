@@ -1,0 +1,49 @@
+{
+  "schema_version": "kcp/0.1",
+  "logical_id": "kc://policy/data-retention/legal-hold-request-procedure",
+  "version": "1.0.0",
+  "capsule_type": "procedure",
+  "statement": "To place a legal hold on customer data: (1) legal counsel submits a hold request identifying the affected accounts and matter, (2) the privacy office suspends the standard retention timer for those accounts within one business day, (3) the hold is logged with a start date and no end date until counsel issues a release.",
+  "epistemic_status": "policy_defined",
+  "confidence": {
+    "basis": "policy_mandate",
+    "ceiling": 0.9,
+    "rationale": "Directly stated in the governing data retention policy document, section 5.1."
+  },
+  "lifecycle_state": "published",
+  "evidence": [
+    {
+      "source_id": "data-retention-policy-v3",
+      "span": "section 5.1",
+      "excerpt": "Legal holds are initiated by counsel, applied by the privacy office within one business day, and remain in effect until counsel issues a written release.",
+      "authority": "primary",
+      "retrieved_at": "2026-01-15T09:00:00Z"
+    }
+  ],
+  "applicability": {
+    "jurisdictions": ["IN"],
+    "valid_from": "2026-01-01",
+    "valid_until": null,
+    "conditions": ["an active legal matter naming the affected accounts"],
+    "exclusions": []
+  },
+  "contradictions": [],
+  "dependencies": [
+    {
+      "capsule_id": "kc://policy/data-retention/customer-data-90-days",
+      "relation": "refines"
+    }
+  ],
+  "governance": {
+    "owner": "privacy-office",
+    "domain": "policy",
+    "permissions": []
+  },
+  "evaluation_contract": {
+    "mandatory_qualifications": ["hold remains until counsel issues a release"],
+    "prohibited_overclaims": ["legal holds expire automatically"],
+    "evaluation_rules": [
+      "answers describing the retention timer must note that a legal hold suspends it"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": "kcp/0.1",
+  "logical_id": "kc://policy/data-retention/retention-answer-rubric",
+  "version": "1.0.0",
+  "capsule_type": "rubric",
+  "statement": "An answer about customer data retention is adequate only if it states the current retention period, names the legal-hold exception, and does not claim data is deleted unconditionally after the retention period.",
+  "epistemic_status": "policy_defined",
+  "confidence": {
+    "basis": "policy_mandate",
+    "ceiling": 0.9,
+    "rationale": "Directly derived from the mandatory qualifications and prohibited overclaims already declared on the retention rule capsules this rubric checks answers against."
+  },
+  "lifecycle_state": "published",
+  "evidence": [],
+  "applicability": {
+    "jurisdictions": ["IN"],
+    "valid_from": "2026-06-01",
+    "valid_until": null,
+    "conditions": ["answer discusses customer data retention duration"],
+    "exclusions": []
+  },
+  "contradictions": [],
+  "dependencies": [
+    {
+      "capsule_id": "kc://policy/data-retention/customer-data-90-days@2.0.0",
+      "relation": "requires"
+    }
+  ],
+  "governance": {
+    "owner": "privacy-office",
+    "domain": "policy",
+    "permissions": []
+  },
+  "evaluation_contract": {
+    "mandatory_qualifications": ["unless a legal hold applies"],
+    "prohibited_overclaims": ["data is always deleted after the retention period"],
+    "evaluation_rules": [
+      "an answer failing to state the current retention period fails this rubric",
+      "an answer omitting the legal-hold exception fails this rubric",
+      "an answer citing the superseded 90-day period as current fails this rubric"
+    ]
+  }
+}

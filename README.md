@@ -431,18 +431,18 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 9 — Ecosystem and interoperability
 
-- [ ] Publish KCP specification drafts
-- [ ] Define `.kcap` compatibility rules
-- [ ] Build import and export tools
-- [ ] Build a Capsule Exchange
-- [ ] Support signed publishers
+- [ ] Publish KCP specification drafts (an external publishing action, not a repo artifact)
+- [x] Define `.kcap` compatibility rules (added to `protocol/kcap-package-format.md`)
+- [x] Build import and export tools (`capsule registry export`/`import`, replaying lifecycle state)
+- [ ] Build a Capsule Exchange (explored, not built — see below)
+- [x] Support signed publishers (Ed25519 signing of a package's content hash: `capsule keygen`, `capsule pack --sign`, `capsule unpack --verify-key`)
 - [ ] Define trust federation policies
 - [ ] Add external registry federation
-- [ ] Create public capsule examples
-- [ ] Build reusable Capsule Packs
-- [ ] Explore a capsule marketplace
-- [ ] Create connector SDK
-- [ ] Add GitHub, SharePoint, Confluence, object-storage, API, and database connectors
+- [x] Create public capsule examples (all 8 `capsule_type` values now covered in `examples/capsules/`)
+- [x] Build reusable Capsule Packs (`capsule pack-create`/`pack-resolve` — a named bundle of registry references, distinct from a `.kcap` archive)
+- [x] Explore a capsule marketplace ([exploration notes](docs/exploration/capsule-marketplace.md), not a build item)
+- [x] Create connector SDK ([`connector-sdk`](connector-sdk): the `SourceConnector` trait, plus a real filesystem implementation)
+- [ ] Add GitHub, SharePoint, Confluence, object-storage, API, and database connectors (each needs real credentials and integration testing this environment can't do honestly; the trait is the deliverable — see `connector-sdk/README.md`)
 
 ## Phase 10 — Scale and enterprise readiness
 
@@ -486,8 +486,10 @@ CapsuleDB/
 ├── capsule-resolver/
 ├── capsule-runtime/
 ├── capsule-evaluator/
+├── capsule-observatory/
 ├── capsule-api/
 ├── capsule-cli/
+├── connector-sdk/
 ├── sdk-python/
 ├── sdk-typescript/
 ├── capsule-studio/
@@ -499,7 +501,7 @@ CapsuleDB/
 
 ## Current status
 
-Phases 0-8 are implemented:
+Phases 0-9 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
@@ -510,13 +512,14 @@ Phases 0-8 are implemented:
 - `capsule-api` is a minimal HTTP JSON API built directly on `capsule-runtime`, so policy/views/caching/telemetry apply over the network too. Tested with real HTTP requests, not mocks.
 - `sdk-python` and `sdk-typescript` are dependency-free HTTP clients for `capsule-api`, both smoke-tested end to end against a live server.
 - `capsule-evaluator` evaluates an answer against the capsules that back it: claim decomposition, claim-to-capsule mapping (explicit citation or lexical overlap, split into strong/ambiguous bands), seven deterministic detectors, an evaluation-surface manifest, and the three scores from the roadmap. A bounded-judge boundary is real (only ambiguous claims are ever referred) but no LLM judge is wired in — `NullJudge` always abstains.
-- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, `keygen`, `evaluate`, `observatory`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve → evaluate loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
+- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, `keygen`, `evaluate`, `observatory`, `pack-create`, `pack-resolve`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit|export|import>`. The whole compile → register → approve → publish → resolve → evaluate loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
 - `capsule-studio` is a single static `index.html` (no build step) driving `capsule-api` from a browser: inspection, evidence/confidence/contradiction viewers, dependency lookups, the approval workflow, resolution, and evaluation reports. Driven end to end in a real headless-Chromium session, which caught and led to fixing a genuine bug — `GET /capsule` was serving a stale cached copy after a transition, because the mutating endpoints wrote to the registry without invalidating `capsule-runtime`'s cache.
 - `capsule-observatory` runs registry-wide health checks: freshness, unresolved contradictions, orphaned capsules, broken dependencies, confidence-laundering incidents, knowledge debt, expiry alerts, and the capsule reuse ratio.
+- `connector-sdk` defines the `SourceConnector` trait that feeds `capsule-compiler`, with a real filesystem implementation; `capsule-cli` gained `pack --sign`/`unpack --verify-key` (Ed25519 signed publishers), `registry export`/`import` (bulk migration, replaying lifecycle state), and `pack-create`/`pack-resolve` (Capsule Packs — named bundles of registry references).
 
 Building all of this surfaced and fixed three real bugs from earlier phases, each caught by actually exercising the system rather than by inspection: the content hash originally covered identity fields, making the spec's own cross-logical-ID dedup claim impossible (fixed in Phase 2); the resolver treated an anonymous request as bypassing permission checks entirely rather than as unprivileged (fixed while building Phase 5, alongside correcting the Phase 0 example capsules and spec wording that had conflated permission *roles* with capability *verbs*); and `capsule-api`'s mutating routes wrote straight to the registry without invalidating `capsule-runtime`'s cache, so a capsule fetched once would appear stuck at its first-seen lifecycle state forever (found by driving Capsule Studio in a real browser against a live server, fixed in Phase 7).
 
-Phase 9 (Ecosystem and interoperability) has not started. See the roadmap below for what's next.
+Phase 10 (Scale and enterprise readiness) has not started. See the roadmap below for what's next.
 
 ---
 

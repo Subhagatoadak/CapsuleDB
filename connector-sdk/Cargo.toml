@@ -1,0 +1,11 @@
+[package]
+name = "connector-sdk"
+description = "SourceConnector trait for feeding capsule-compiler from external sources, plus a filesystem reference implementation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+capsule-compiler = { path = "../capsule-compiler" }
+thiserror.workspace = true

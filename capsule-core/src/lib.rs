@@ -64,6 +64,10 @@ mod tests {
             include_str!("../../examples/capsules/data-retention-180-days.json"),
             include_str!("../../examples/capsules/marketing-incrementality-estimate.json"),
             include_str!("../../examples/capsules/marketing-incrementality-counterexample.json"),
+            include_str!("../../examples/capsules/legal-hold-procedure.json"),
+            include_str!("../../examples/capsules/legal-hold-interpretation.json"),
+            include_str!("../../examples/capsules/research-dataset-boundary.json"),
+            include_str!("../../examples/capsules/retention-answer-rubric.json"),
         ];
         for json in fixtures {
             let capsule = parse(json).expect("bundled example must parse");

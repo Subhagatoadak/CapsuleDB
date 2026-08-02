@@ -1,0 +1,49 @@
+{
+  "schema_version": "kcp/0.1",
+  "logical_id": "kc://policy/data-retention/closure-means-formal-closure",
+  "version": "1.0.0",
+  "capsule_type": "interpretation",
+  "statement": "\"Account closure\" in the retention policy means the account's formal closure date recorded in the billing system, not the date a customer last logged in or stopped paying.",
+  "epistemic_status": "expert_judgement",
+  "confidence": {
+    "basis": "expert_consensus",
+    "ceiling": 0.7,
+    "rationale": "Privacy office and legal counsel's shared reading of an ambiguous policy term; not itself a stated policy clause, so held to a lower ceiling than the underlying rule."
+  },
+  "lifecycle_state": "published",
+  "evidence": [
+    {
+      "source_id": "privacy-legal-interpretation-memo-2026-02",
+      "span": "paragraph 3",
+      "excerpt": "The retention clock begins at the account's recorded closure date in the billing system; inactivity or non-payment alone do not constitute closure.",
+      "authority": "secondary",
+      "retrieved_at": "2026-02-10T09:00:00Z"
+    }
+  ],
+  "applicability": {
+    "jurisdictions": ["IN"],
+    "valid_from": "2026-02-10",
+    "valid_until": null,
+    "conditions": [],
+    "exclusions": []
+  },
+  "contradictions": [],
+  "dependencies": [
+    {
+      "capsule_id": "kc://policy/data-retention/customer-data-90-days",
+      "relation": "refines"
+    }
+  ],
+  "governance": {
+    "owner": "privacy-office",
+    "domain": "policy",
+    "permissions": []
+  },
+  "evaluation_contract": {
+    "mandatory_qualifications": ["this is an interpretation, not the policy text itself"],
+    "prohibited_overclaims": ["the policy explicitly defines account closure this way"],
+    "evaluation_rules": [
+      "answers must not present this interpretation with the same confidence as the underlying policy rule"
+    ]
+  }
+}

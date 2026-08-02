@@ -3,6 +3,8 @@ use anyhow::{Context, Result};
 use capsule_core::LifecycleState;
 use capsule_registry::{CapsuleRecord, Registry};
 use clap::Subcommand;
+use std::fs;
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Subcommand)]
@@ -47,6 +49,18 @@ pub enum RegistryCommand {
     Audit {
         #[arg(long, default_value_t = 20)]
         limit: u32,
+    },
+    /// Export every registered capsule version to a JSONL file (one capsule document per line).
+    Export {
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Bulk-register capsules from a JSONL file (as produced by `export`), replaying each one's lifecycle state.
+    Import {
+        file: PathBuf,
+        /// Actor recorded for the registration and any replayed lifecycle transitions.
+        #[arg(long)]
+        actor: String,
     },
 }
 
@@ -115,9 +129,79 @@ pub fn run(db: &Path, action: RegistryCommand) -> Result<()> {
                 println!("{} {} {}@{} by {}", event.occurred_at, event.event_type, logical_id, version, event.actor);
             }
         }
+        RegistryCommand::Export { out } => {
+            let mut file = fs::File::create(&out).with_context(|| format!("creating {}", out.display()))?;
+            let mut count = 0usize;
+            for logical_id in registry.list_logical_ids()? {
+                for record in registry.list_versions(&logical_id)? {
+                    writeln!(file, "{}", serde_json::to_string(&record.capsule)?)?;
+                    count += 1;
+                }
+            }
+            println!("exported {count} capsule version(s) -> {}", out.display());
+        }
+        RegistryCommand::Import { file, actor } => {
+            let reader = BufReader::new(fs::File::open(&file).with_context(|| format!("opening {}", file.display()))?);
+            let (mut imported, mut skipped, mut failed) = (0usize, 0usize, 0usize);
+            for (line_number, line) in reader.lines().enumerate() {
+                let line = line?;
+                if line.trim().is_empty() {
+                    continue;
+                }
+                match import_one(&mut registry, &line, &actor) {
+                    Ok(true) => imported += 1,
+                    Ok(false) => skipped += 1,
+                    Err(e) => {
+                        eprintln!("line {}: {e}", line_number + 1);
+                        failed += 1;
+                    }
+                }
+            }
+            println!("imported {imported}, skipped (already present) {skipped}, failed {failed}");
+        }
     }
 
     Ok(())
+}
+
+/// Registers one exported capsule document, forcing it to `draft` first
+/// (lifecycle state is administrative and excluded from the content
+/// hash — see `capsule-core::hashing` — so this doesn't change identity)
+/// and then replaying the minimal transition chain to reach its
+/// original lifecycle state. Returns `Ok(true)` if newly imported,
+/// `Ok(false)` if it was already present with identical content.
+fn import_one(registry: &mut Registry, line: &str, actor: &str) -> Result<bool> {
+    let mut value: serde_json::Value = serde_json::from_str(line)?;
+    let original_state: LifecycleState = serde_json::from_value(value["lifecycle_state"].clone())?;
+    value["lifecycle_state"] = serde_json::Value::String("draft".to_string());
+    let draft_capsule: capsule_core::Capsule = serde_json::from_value(value)?;
+
+    let logical_id = draft_capsule.logical_id.clone();
+    let version = draft_capsule.version.clone();
+    let already_present = registry.get(&logical_id, &version)?.is_some();
+
+    registry.register(&draft_capsule, actor)?;
+
+    use LifecycleState::*;
+    let path: &[LifecycleState] = match original_state {
+        Draft => &[],
+        InReview => &[InReview],
+        Approved => &[InReview, Approved],
+        Published => &[InReview, Approved, Published],
+        Deprecated => &[InReview, Approved, Published, Deprecated],
+        Superseded => &[InReview, Approved, Published, Superseded],
+        Revoked => &[Revoked],
+    };
+    for state in path {
+        // Already at or past this state (e.g. re-importing into the same
+        // registry) — a repeat transition would be rejected as illegal.
+        if registry.get(&logical_id, &version)?.map(|r| r.lifecycle_state) == Some(*state) {
+            continue;
+        }
+        registry.transition(&logical_id, &version, *state, actor, Some("bulk import replay"))?;
+    }
+
+    Ok(!already_present)
 }
 
 fn print_record(record: &CapsuleRecord) {

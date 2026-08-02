@@ -1,6 +1,7 @@
 mod compile_cmd;
 mod evaluate_cmd;
 mod observatory_cmd;
+mod pack_list_cmd;
 mod registry_cmd;
 mod resolve_cmd;
 
@@ -47,6 +48,9 @@ enum Command {
         /// Optional directory of evidence source files to bundle under evidence/.
         #[arg(long)]
         evidence_dir: Option<PathBuf>,
+        /// Path to a hex-encoded Ed25519 secret key (see `capsule keygen`) to sign the package's content hash.
+        #[arg(long)]
+        sign: Option<PathBuf>,
     },
     /// Extract a .kcap archive, verifying manifest checksums and content hash.
     Unpack {
@@ -55,6 +59,9 @@ enum Command {
         /// Output directory.
         #[arg(short, long)]
         output: PathBuf,
+        /// Path to a hex-encoded Ed25519 public key; if given, the package's signature must verify against it.
+        #[arg(long)]
+        verify_key: Option<PathBuf>,
     },
     /// Register, transition, publish, and inspect capsules in a
     /// SQLite-backed capsule-registry.
@@ -131,6 +138,22 @@ enum Command {
         #[arg(long, default_value_t = 30)]
         knowledge_debt_days: i64,
     },
+    /// Create a Capsule Pack manifest: a named, versioned bundle of capsule references.
+    PackCreate {
+        output: PathBuf,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        description: Option<String>,
+        /// Members as `kc://domain/topic/name` (latest published) or `kc://domain/topic/name@1.2.3` (pinned).
+        members: Vec<String>,
+    },
+    /// Resolve a Capsule Pack's members against a registry and confirm they're all published.
+    PackResolve {
+        pack_file: PathBuf,
+        #[arg(long, default_value = "capsuledb.sqlite3")]
+        db: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -138,8 +161,8 @@ fn main() -> Result<()> {
     match cli.command {
         Command::Inspect { capsule } => cmd_inspect(&capsule),
         Command::Validate { capsule } => cmd_validate(&capsule),
-        Command::Pack { capsule, output, evidence_dir } => cmd_pack(&capsule, &output, evidence_dir.as_deref()),
-        Command::Unpack { package, output } => cmd_unpack(&package, &output),
+        Command::Pack { capsule, output, evidence_dir, sign } => cmd_pack(&capsule, &output, evidence_dir.as_deref(), sign.as_deref()),
+        Command::Unpack { package, output, verify_key } => cmd_unpack(&package, &output, verify_key.as_deref()),
         Command::Registry { db, action } => registry_cmd::run(&db, action),
         Command::Compile { source, format, domain, topic, owner, out_dir } => compile_cmd::run(&source, format, &domain, &topic, &owner, &out_dir),
         Command::Resolve { db, purpose, domain, about, jurisdiction, as_of, consumer_role, require_sufficient_evidence, plan } => {
@@ -148,6 +171,8 @@ fn main() -> Result<()> {
         Command::Keygen { out_prefix } => cmd_keygen(out_prefix.as_deref()),
         Command::Evaluate { answer_file, db, discretion } => evaluate_cmd::run(&db, &answer_file, discretion),
         Command::Observatory { db, freshness_days, knowledge_debt_days } => observatory_cmd::run_cmd(&db, freshness_days, knowledge_debt_days),
+        Command::PackCreate { output, name, description, members } => pack_list_cmd::create(&output, &name, description.as_deref(), members),
+        Command::PackResolve { pack_file, db } => pack_list_cmd::resolve(&pack_file, &db),
     }
 }
 
@@ -264,7 +289,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn cmd_pack(capsule_path: &Path, output: &Path, evidence_dir: Option<&Path>) -> Result<()> {
+fn cmd_pack(capsule_path: &Path, output: &Path, evidence_dir: Option<&Path>, sign: Option<&Path>) -> Result<()> {
     let capsule_text = fs::read_to_string(capsule_path).with_context(|| format!("reading {}", capsule_path.display()))?;
     let capsule = parse(&capsule_text).with_context(|| format!("parsing capsule at {}", capsule_path.display()))?;
 
@@ -294,6 +319,15 @@ fn cmd_pack(capsule_path: &Path, output: &Path, evidence_dir: Option<&Path>) -> 
         }
     }
 
+    let (signature, public_key) = match sign {
+        Some(key_path) => {
+            let secret_hex = fs::read_to_string(key_path).with_context(|| format!("reading secret key at {}", key_path.display()))?;
+            let keypair = capsule_runtime::KeyPair::from_secret_hex(secret_hex.trim()).map_err(|e| anyhow::anyhow!(e))?;
+            (Some(keypair.sign_content_hash(&hash)), Some(keypair.public_key_hex()))
+        }
+        None => (None, None),
+    };
+
     let manifest = Manifest {
         kcp_version: "0.1".to_string(),
         packaged_at: chrono::Utc::now().to_rfc3339(),
@@ -301,6 +335,8 @@ fn cmd_pack(capsule_path: &Path, output: &Path, evidence_dir: Option<&Path>) -> 
         capsule_version: capsule.version.clone(),
         content_hash: hash,
         files,
+        signature,
+        public_key,
     };
     let manifest_json = serde_json::to_vec_pretty(&manifest)?;
 
@@ -315,7 +351,10 @@ fn cmd_pack(capsule_path: &Path, output: &Path, evidence_dir: Option<&Path>) -> 
     }
 
     builder.finish()?;
-    println!("packed {} -> {}", capsule.logical_id, output.display());
+    match &manifest.public_key {
+        Some(key) => println!("packed {} -> {}, signed by {key}", capsule.logical_id, output.display()),
+        None => println!("packed {} -> {}", capsule.logical_id, output.display()),
+    }
     Ok(())
 }
 
@@ -328,7 +367,7 @@ fn append_bytes<W: Write>(builder: &mut tar::Builder<W>, path: &str, bytes: &[u8
     Ok(())
 }
 
-fn cmd_unpack(package: &Path, output: &Path) -> Result<()> {
+fn cmd_unpack(package: &Path, output: &Path, verify_key: Option<&Path>) -> Result<()> {
     let file = fs::File::open(package).with_context(|| format!("opening {}", package.display()))?;
     let decoder = GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
@@ -386,8 +425,23 @@ fn cmd_unpack(package: &Path, output: &Path) -> Result<()> {
         );
     }
 
+    let signature_note = match (verify_key, &manifest.signature, &manifest.public_key) {
+        (Some(key_path), Some(signature), Some(public_key)) => {
+            let public_key_expected = fs::read_to_string(key_path).with_context(|| format!("reading public key at {}", key_path.display()))?;
+            let public_key_expected = public_key_expected.trim();
+            if public_key_expected != public_key {
+                bail!("package is signed by {public_key}, not by the provided verify-key {public_key_expected}");
+            }
+            capsule_runtime::verify_content_hash(public_key, &manifest.content_hash, signature).map_err(|e| anyhow::anyhow!(e))?;
+            format!(", signature verified against {public_key}")
+        }
+        (Some(_), None, _) => bail!("--verify-key was given but this package is unsigned"),
+        (None, Some(_), Some(public_key)) => format!(", signed by {public_key} (pass --verify-key to verify)"),
+        _ => String::new(),
+    };
+
     println!(
-        "unpacked {} ({} files) -> {}, content hash verified",
+        "unpacked {} ({} files) -> {}, content hash verified{signature_note}",
         manifest.capsule_logical_id,
         manifest.files.len(),
         output.display()
@@ -403,6 +457,12 @@ struct Manifest {
     capsule_version: String,
     content_hash: String,
     files: Vec<ManifestFile>,
+    /// Hex Ed25519 signature over `content_hash`, if the package was
+    /// signed with `capsule pack --sign` (spec: "signed publishers").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    signature: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    public_key: Option<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

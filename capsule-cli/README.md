@@ -17,10 +17,13 @@ cargo run -p capsule-cli -- unpack retention.kcap -o ./out
   do not fail the exit code).
 - `pack` — refuses to package an invalid capsule; produces a `.kcap`
   archive per `protocol/kcap-package-format.md`, optionally bundling an
-  evidence directory.
+  evidence directory. `--sign <secret-key-file>` (see `keygen` below)
+  signs the package's content hash.
 - `unpack` — extracts a `.kcap` archive and verifies every file's checksum
   against the manifest and the capsule's own content hash, so
   archive-level or JSON-level tampering are both detected.
+  `--verify-key <public-key-file>` additionally requires the package's
+  signature to verify against that key.
 
 ## Registry
 
@@ -36,6 +39,8 @@ capsule registry --db capsules.sqlite3 dependencies kc://policy/x/y 1.0.0
 capsule registry --db capsules.sqlite3 dependents kc://policy/x/y 1.0.0
 capsule registry --db capsules.sqlite3 evidence some-source-id
 capsule registry --db capsules.sqlite3 audit --limit 20
+capsule registry --db capsules.sqlite3 export --out capsules.jsonl
+capsule registry --db other.sqlite3 import capsules.jsonl --actor bulk-import
 ```
 
 `register` requires the capsule to be `lifecycle_state: draft` — the
@@ -44,6 +49,15 @@ illustrating the spec, so set `lifecycle_state` to `draft` before
 registering a copy of one. `publish` auto-supersedes any `supersedes`
 dependency target that is currently `published` (see
 `capsule-registry/README.md`).
+
+`export` dumps every registered capsule version as one JSON document per
+line. `import` bulk-registers from that file into a (possibly different)
+registry, replaying each capsule's original lifecycle state — a capsule
+exported as `published` comes back `published`, not stuck at `draft` —
+since lifecycle state and governance are excluded from the content hash
+(spec §2.3) and can be re-derived without changing the capsule's
+identity. Auto-supersession from `publish` is not replayed; import uses
+plain transitions.
 
 ## Compile
 
@@ -118,3 +132,23 @@ laundering incidents (a capsule's own statement vs. its own evidence
 excerpt), knowledge debt (stale unpublished drafts), expiry alerts
 (published past `applicability.valid_until`), and the capsule reuse
 ratio. See `capsule-observatory/README.md`.
+
+## Packs
+
+```bash
+capsule pack-create retention.pack.json --name retention-policy \
+  --description "Everything needed to answer a retention question" \
+  kc://policy/data-retention/customer-data-90-days \
+  kc://policy/data-retention/legal-hold-request-procedure
+
+capsule pack-resolve retention.pack.json --db capsules.sqlite3
+```
+
+A Capsule Pack is a named, versioned bundle of capsule *references* —
+the unit the README's Capsule Query Language sketches as `VERIFY answer
+AGAINST PACK "..."`. Distinct from a `.kcap` package (one signed,
+self-contained archive): a pack manifest is lightweight JSON pointing
+into a registry, not a copy of the capsules. `pack-create` writes the
+manifest; `pack-resolve` looks up every member (unpinned references
+resolve to the latest published version) and fails if any is missing
+or not published.
