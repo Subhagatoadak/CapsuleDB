@@ -104,6 +104,31 @@ mod tests {
     }
 
     #[test]
+    fn anonymous_request_does_not_see_restricted_capsules() {
+        // Regression: a request with no consumer_role at all must be
+        // treated as unprivileged, not as bypassing permission checks.
+        let mut registry = Registry::open_in_memory().unwrap();
+        let json = r#"{
+          "schema_version": "kcp/0.1",
+          "logical_id": "kc://policy/internal/rule-a",
+          "version": "1.0.0",
+          "capsule_type": "rule",
+          "statement": "Internal only.",
+          "epistemic_status": "policy_defined",
+          "confidence": {"basis": "policy_mandate", "ceiling": 0.9},
+          "lifecycle_state": "draft",
+          "governance": {"owner": "alice", "domain": "policy", "permissions": ["legal-team"]}
+        }"#;
+        publish(&mut registry, json);
+
+        let resolver = Resolver::new(&registry);
+        let request = ResolutionRequest::new("check");
+        assert!(request.consumer_role.is_none());
+        let bundle = resolver.resolve(&request).unwrap();
+        assert!(bundle.capsules.is_empty());
+    }
+
+    #[test]
     fn dependency_completion_propagates_confidence_ceiling() {
         let mut registry = Registry::open_in_memory().unwrap();
         let base_json = r#"{

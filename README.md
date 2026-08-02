@@ -366,19 +366,19 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 5 — Capsule Runtime
 
-- [ ] Create local embedded runtime
-- [ ] Create remote API runtime
-- [ ] Add signed capsule verification
-- [ ] Add policy enforcement
-- [ ] Add purpose-bound access
-- [ ] Add consumer-specific capsule views
-- [ ] Add local cache
-- [ ] Add offline mode
-- [ ] Add synchronisation with a central registry
-- [ ] Add update subscriptions
-- [ ] Add revocation propagation
-- [ ] Add usage telemetry
-- [ ] Add SDKs for Python and TypeScript
+- [x] Create local embedded runtime ([`capsule-runtime`](capsule-runtime))
+- [x] Create remote API runtime ([`capsule-api`](capsule-api), built on `capsule-runtime`)
+- [x] Add signed capsule verification (Ed25519 over the content hash; see `capsule-runtime/src/signing.rs`)
+- [x] Add policy enforcement (role allowlist in `governance.permissions`; anonymous = unprivileged, never unrestricted)
+- [ ] Add purpose-bound access (`purpose` is accepted on `AccessRequest`/`ResolutionRequest` but not yet enforced against any purpose vocabulary — same gap as the resolver's "purpose resolution")
+- [x] Add consumer-specific capsule views (evidence redaction without `can_read_evidence`)
+- [x] Add local cache
+- [x] Add offline mode (trivial by construction: SQLite is local, so there's no server to lose contact with)
+- [ ] Add synchronisation with a central registry (no multi-registry replication; only single-registry polling for local cache invalidation)
+- [x] Add update subscriptions (pull/poll-based via `Runtime::poll_updates` against the registry's audit log, not push/webhook)
+- [x] Add revocation propagation (cache invalidated on lifecycle-transition events found by polling)
+- [x] Add usage telemetry (in-process; not yet persisted)
+- [x] Add SDKs for Python and TypeScript ([`sdk-python`](sdk-python), [`sdk-typescript`](sdk-typescript) — both dependency-free HTTP clients, both smoke-tested against a real `capsule-api` process)
 
 ## Phase 6 — Epistemic Evaluation Engine
 
@@ -499,16 +499,21 @@ CapsuleDB/
 
 ## Current status
 
-Phases 0-4 are implemented:
+Phases 0-5 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
 - `capsule-registry` persists capsules in embedded SQLite: immutable versions, an append-only lifecycle/approval/publication/revocation ledger, content-addressed deduplication, dependency and evidence-family tracking, auto-supersession on publish, and an audit trail. A Postgres schema is drafted for a later backend.
 - `capsule-compiler` turns text/Markdown/HTML/PDF sources into draft candidate capsules deterministically: span-bound claim extraction, epistemic-status classification, qualification/exclusion/condition detection, evidence-duplication detection, and immediate `capsule_core::validate` pre-validation — no LLM step yet.
 - `capsule-resolver` resolves the applicable capsule set for a request: filtering (domain/type/keyword/jurisdiction/permission/evidence-sufficiency), temporal version resolution, authority ordering, transitive `requires` dependency completion with confidence-ceiling propagation, contradiction bundling, known-gap reporting, and an inspectable, replayable resolution plan.
-- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
+- `capsule-runtime` is the embeddable local runtime: policy enforcement and consumer-specific views on top of the resolver's permission model, a local cache with poll-based revocation propagation, usage telemetry, and Ed25519 signed-content-hash verification.
+- `capsule-api` is a minimal HTTP JSON API built directly on `capsule-runtime`, so policy/views/caching/telemetry apply over the network too. Tested with real HTTP requests, not mocks.
+- `sdk-python` and `sdk-typescript` are dependency-free HTTP clients for `capsule-api`, both smoke-tested end to end against a live server.
+- `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, `resolve`, `keygen`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish → resolve loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
 
-Phase 5 (Capsule Runtime) has not started. See the roadmap below for what's next.
+Building all of this surfaced and fixed two real bugs from earlier phases: the content hash originally covered identity fields, making the spec's own cross-logical-ID dedup claim impossible (fixed in Phase 2); and the resolver treated an anonymous request as bypassing permission checks entirely rather than as unprivileged (fixed while building Phase 5, alongside correcting the Phase 0 example capsules and spec wording that had conflated permission *roles* with capability *verbs*).
+
+Phase 6 (Epistemic Evaluation Engine) has not started. See the roadmap below for what's next.
 
 ---
 

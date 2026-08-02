@@ -1,0 +1,23 @@
+[package]
+name = "capsule-api"
+description = "Minimal HTTP JSON API over capsule-runtime (Phase 5 remote runtime surface)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "capsule-api"
+path = "src/main.rs"
+
+[dependencies]
+capsule-core = { path = "../capsule-core" }
+capsule-registry = { path = "../capsule-registry" }
+capsule-resolver = { path = "../capsule-resolver" }
+capsule-runtime = { path = "../capsule-runtime" }
+tiny_http = { version = "0.12", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+clap.workspace = true
+anyhow.workspace = true

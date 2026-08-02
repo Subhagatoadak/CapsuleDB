@@ -24,18 +24,25 @@
     "jurisdictions": [],
     "valid_from": "2026-01-01",
     "valid_until": "2026-03-31",
-    "conditions": ["applies to the paid search channel only"],
-    "exclusions": ["not validated for other channels or subsequent quarters"]
+    "conditions": [
+      "applies to the paid search channel only"
+    ],
+    "exclusions": [
+      "not validated for other channels or subsequent quarters"
+    ]
   },
   "contradictions": [],
   "dependencies": [],
   "governance": {
     "owner": "growth-analytics",
     "domain": "marketing",
-    "permissions": ["read"]
+    "permissions": []
   },
   "evaluation_contract": {
-    "mandatory_qualifications": ["estimated", "single experiment, not yet replicated"],
+    "mandatory_qualifications": [
+      "estimated",
+      "single experiment, not yet replicated"
+    ],
     "prohibited_overclaims": [
       "paid search causes a 6-9% lift as an established fact",
       "this lift generalizes to other channels or quarters"

@@ -103,6 +103,12 @@ enum Command {
         #[arg(long)]
         plan: bool,
     },
+    /// Generate an Ed25519 keypair for signing capsule content hashes.
+    Keygen {
+        /// Write "<prefix>.pub" (hex public key) and "<prefix>.key" (hex secret key) instead of printing to stdout.
+        #[arg(long)]
+        out_prefix: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -117,7 +123,33 @@ fn main() -> Result<()> {
         Command::Resolve { db, purpose, domain, about, jurisdiction, as_of, consumer_role, require_sufficient_evidence, plan } => {
             resolve_cmd::run(&db, &purpose, domain, about, jurisdiction, as_of, consumer_role, require_sufficient_evidence, plan)
         }
+        Command::Keygen { out_prefix } => cmd_keygen(out_prefix.as_deref()),
     }
+}
+
+fn cmd_keygen(out_prefix: Option<&Path>) -> Result<()> {
+    let keypair = capsule_runtime::KeyPair::generate().map_err(|e| anyhow::anyhow!(e))?;
+    match out_prefix {
+        Some(prefix) => {
+            let pub_path = append_extension(prefix, "pub");
+            let key_path = append_extension(prefix, "key");
+            fs::write(&pub_path, keypair.public_key_hex())?;
+            fs::write(&key_path, keypair.secret_key_hex())?;
+            println!("wrote {} and {}", pub_path.display(), key_path.display());
+        }
+        None => {
+            println!("public_key: {}", keypair.public_key_hex());
+            println!("secret_key: {}", keypair.secret_key_hex());
+        }
+    }
+    Ok(())
+}
+
+fn append_extension(prefix: &Path, ext: &str) -> PathBuf {
+    let mut path = prefix.to_path_buf();
+    let file_name = format!("{}.{ext}", path.file_name().and_then(|n| n.to_str()).unwrap_or("capsuledb"));
+    path.set_file_name(file_name);
+    path
 }
 
 pub(crate) fn load_capsule(path: &Path) -> Result<Capsule> {

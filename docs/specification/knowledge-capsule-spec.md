@@ -210,13 +210,22 @@ Deterministic rule (enforced by `capsule-core::validation`):
 ## 9. Governance and evaluation contract
 
 ```json
-"governance": { "owner": "string", "domain": "string", "permissions": ["read", "write", "approve"] },
+"governance": { "owner": "string", "domain": "string", "permissions": ["legal-team", "privacy-office"] },
 "evaluation_contract": {
   "mandatory_qualifications": ["string"],
   "prohibited_overclaims": ["string"],
   "evaluation_rules": ["string"]
 }
 ```
+
+`permissions` is an allowlist of consumer role identities, not a
+capability/verb list: **empty means public** (any consumer may resolve or
+read the capsule); non-empty means only a consumer presenting one of the
+listed roles may. `capsule-resolver` and `capsule-runtime` (Phase 4/5)
+enforce this as a closed-world check — a request that supplies no role at
+all is treated as unprivileged, not as bypassing the restriction, so a
+capsule can never be accidentally made public by a caller simply omitting
+its identity.
 
 ## 10. Minimum required fields
 

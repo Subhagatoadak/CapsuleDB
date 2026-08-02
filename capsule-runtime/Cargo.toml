@@ -1,0 +1,17 @@
+[package]
+name = "capsule-runtime"
+description = "Embeddable local runtime over capsule-registry: policy enforcement, consumer views, caching, usage telemetry, and signed capsule verification"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+capsule-core = { path = "../capsule-core" }
+capsule-registry = { path = "../capsule-registry" }
+capsule-resolver = { path = "../capsule-resolver" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+ed25519-dalek = { version = "3.0.0", default-features = false, features = ["fast", "zeroize"] }
+getrandom = "0.4"

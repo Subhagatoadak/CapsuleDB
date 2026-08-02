@@ -38,11 +38,15 @@
   "governance": {
     "owner": "growth-analytics",
     "domain": "marketing",
-    "permissions": ["read"]
+    "permissions": []
   },
   "evaluation_contract": {
-    "mandatory_qualifications": ["preliminary audit finding, unresolved"],
-    "prohibited_overclaims": ["the original lift estimate is definitively wrong"],
+    "mandatory_qualifications": [
+      "preliminary audit finding, unresolved"
+    ],
+    "prohibited_overclaims": [
+      "the original lift estimate is definitively wrong"
+    ],
     "evaluation_rules": [
       "any answer citing the Q1 2026 lift estimate must also surface this unresolved contradiction"
     ]

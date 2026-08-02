@@ -21,11 +21,17 @@
     }
   ],
   "applicability": {
-    "jurisdictions": ["IN"],
+    "jurisdictions": [
+      "IN"
+    ],
     "valid_from": "2026-06-01",
     "valid_until": null,
-    "conditions": ["account has been formally closed"],
-    "exclusions": ["records subject to an active legal hold"]
+    "conditions": [
+      "account has been formally closed"
+    ],
+    "exclusions": [
+      "records subject to an active legal hold"
+    ]
   },
   "contradictions": [],
   "dependencies": [
@@ -37,11 +43,15 @@
   "governance": {
     "owner": "privacy-office",
     "domain": "policy",
-    "permissions": ["read"]
+    "permissions": []
   },
   "evaluation_contract": {
-    "mandatory_qualifications": ["unless a legal hold applies"],
-    "prohibited_overclaims": ["data is always deleted after 90 days"],
+    "mandatory_qualifications": [
+      "unless a legal hold applies"
+    ],
+    "prohibited_overclaims": [
+      "data is always deleted after 90 days"
+    ],
     "evaluation_rules": [
       "answers must not state the retention period without the legal-hold exception",
       "answers must not cite the superseded 90-day period as current"

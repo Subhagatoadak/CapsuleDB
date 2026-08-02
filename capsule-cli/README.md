@@ -72,3 +72,19 @@ temporally-applicable published version of each match; pulls in
 `requires` dependencies (propagating the confidence-ceiling rule) and any
 contradictions; and — with `--plan` — prints the full inclusion/exclusion
 decision trail. See `capsule-resolver/README.md`.
+
+Note: a request with no `--consumer-role` is anonymous/public and will
+not see capsules whose `governance.permissions` is non-empty — see
+`capsule-runtime/README.md`.
+
+## Keygen
+
+```bash
+capsule keygen                        # print public_key / secret_key hex to stdout
+capsule keygen --out-prefix my-key    # write my-key.pub and my-key.key
+```
+
+Generates an Ed25519 keypair for signing capsule content hashes (see
+`capsule-runtime/README.md`). Signing/verification of `.kcap` packages
+with this key is a `capsule-cli` `pack --sign`/`unpack` feature (Phase 9,
+signed publishers).

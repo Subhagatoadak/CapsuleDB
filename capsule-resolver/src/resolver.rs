@@ -68,9 +68,13 @@ impl<'a> Resolver<'a> {
                 }
             }
 
-            if let Some(role) = &request.consumer_role {
-                let perms = &record.capsule.governance.permissions;
-                if !perms.is_empty() && !perms.iter().any(|p| p == role) {
+            let perms = &record.capsule.governance.permissions;
+            if !perms.is_empty() {
+                // A capsule with a non-empty permissions list is not
+                // public: an anonymous request (no consumer_role at all)
+                // must be treated as unprivileged, not as "unrestricted."
+                let permitted = request.consumer_role.as_deref().is_some_and(|role| perms.iter().any(|p| p == role));
+                if !permitted {
                     plan.push(exclude(&record, "consumer role not permitted"));
                     continue;
                 }

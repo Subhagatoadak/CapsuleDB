@@ -1,0 +1,14 @@
+{
+  "name": "@capsuledb/sdk",
+  "version": "0.1.0",
+  "description": "Thin HTTP client for capsule-api",
+  "type": "module",
+  "main": "src/client.ts",
+  "types": "src/client.ts",
+  "scripts": {
+    "test": "node --test tests/smoke.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
