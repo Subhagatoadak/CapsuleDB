@@ -42,4 +42,40 @@ Design points:
   bitemporal resolution — full authority ordering and dependency
   completion belong to `capsule-resolver` (Phase 4).
 
-Exposed via the CLI as `capsule registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>` (see `capsule-cli`).
+Exposed via the CLI as `capsule registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit|export|import|backup|restore|audit-export>` (see `capsule-cli`).
+
+## Tenant isolation
+
+`TenantStore` (Phase 10) opens one SQLite file per tenant under a shared
+base directory, rather than adding a `tenant_id` column to the shared
+schema above:
+
+```rust
+let store = capsule_registry::TenantStore::new("./tenants")?;
+let mut acme = store.registry_for("acme-corp")?;   // ./tenants/acme-corp.sqlite3
+let mut globex = store.registry_for("globex")?;    // ./tenants/globex.sqlite3
+```
+
+Five other crates are built directly on `Registry`'s query surface;
+retrofitting every one of those queries with `WHERE tenant_id = ?` is a
+lot of surface area to get right, and a single missed clause anywhere is
+a cross-tenant data leak. A file per tenant makes that class of bug
+structurally impossible — there is no connection open to another
+tenant's file, so there is no query that could read its rows. The
+trade-off is real (no cross-tenant SQL joins, N open file handles
+instead of one) and is judged worth it here. Tenant IDs are sanitized to
+`[a-zA-Z0-9_-]` before being used as a filename, so an untrusted tenant
+identifier (e.g. from an API request) can't path-traverse out of the
+base directory.
+
+## Backup and disaster recovery
+
+`Registry::backup_to` uses SQLite's online backup API to write a
+consistent point-in-time copy while the source stays open for
+concurrent reads/writes — unlike copying the file's bytes directly,
+which can capture a torn write mid-transaction. `Registry::audit_log_all`
+returns the complete, unbounded audit ledger (oldest first) for
+compliance export, as opposed to `audit_log`'s bounded newest-first page
+for interactive display. Both are exposed via `capsule registry
+backup`/`restore`/`audit-export`, with optional AES-256-GCM
+encryption-at-rest for the backup file (see `capsule-cli/README.md`).

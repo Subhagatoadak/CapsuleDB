@@ -1,4 +1,5 @@
 use capsule_core::{Capsule, DependencyRelation, EvidenceAuthority, LifecycleState};
+use serde::Serialize;
 use serde_json::Value;
 
 /// A registered capsule version, with its current (derived) lifecycle
@@ -52,7 +53,7 @@ pub struct EvidenceLink {
     pub recorded_at: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AuditEvent {
     pub event_type: String,
     pub logical_id: Option<String>,

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: capsule-api
+  namespace: capsuledb
+spec:
+  selector:
+    app: capsule-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8089
+  type: ClusterIP

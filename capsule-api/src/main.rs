@@ -14,9 +14,13 @@ struct Cli {
 }
 
 fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "capsule_api=info".into()))
+        .init();
+
     let cli = Cli::parse();
     let registry = Registry::open(&cli.db)?;
-    println!("capsule-api listening on http://{} (db: {})", cli.addr, cli.db.display());
+    tracing::info!(addr = %cli.addr, db = %cli.db.display(), "capsule-api listening");
     capsule_api::Server::new(registry).run(&cli.addr)?;
     Ok(())
 }

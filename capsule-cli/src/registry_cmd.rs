@@ -1,4 +1,4 @@
-use crate::load_capsule;
+use crate::{crypto, load_capsule};
 use anyhow::{Context, Result};
 use capsule_core::LifecycleState;
 use capsule_registry::{CapsuleRecord, Registry};
@@ -14,6 +14,9 @@ pub enum RegistryCommand {
         capsule: PathBuf,
         #[arg(long)]
         actor: String,
+        /// Path to a policy-as-code JSON file (see `capsule-policy`); refuses to register on any violation.
+        #[arg(long)]
+        policy: Option<PathBuf>,
     },
     /// Apply a lifecycle transition (e.g. draft -> in_review -> approved).
     Transition {
@@ -62,14 +65,48 @@ pub enum RegistryCommand {
         #[arg(long)]
         actor: String,
     },
+    /// Write a consistent point-in-time copy of the whole database (disaster recovery).
+    Backup {
+        #[arg(long)]
+        out: PathBuf,
+        /// Hex AES-256 key (see `capsule datakey`) to encrypt the backup file at rest.
+        #[arg(long)]
+        encrypt_key_file: Option<PathBuf>,
+    },
+    /// Restore a `registry backup` output into a fresh database file.
+    Restore {
+        /// Path to a backup produced by `registry backup`.
+        backup: PathBuf,
+        /// Where to write the restored database (must not already exist).
+        #[arg(long)]
+        out: PathBuf,
+        /// Hex AES-256 key the backup was encrypted with, if `--encrypt-key-file` was used to create it.
+        #[arg(long)]
+        decrypt_key_file: Option<PathBuf>,
+    },
+    /// Export the full audit ledger (every event ever recorded) to a JSONL file.
+    AuditExport {
+        #[arg(long)]
+        out: PathBuf,
+    },
 }
 
 pub fn run(db: &Path, action: RegistryCommand) -> Result<()> {
     let mut registry = Registry::open(db).with_context(|| format!("opening registry at {}", db.display()))?;
 
     match action {
-        RegistryCommand::Register { capsule, actor } => {
+        RegistryCommand::Register { capsule, actor, policy } => {
             let capsule = load_capsule(&capsule)?;
+            if let Some(policy_path) = &policy {
+                let engine = capsule_policy::PolicyEngine::load(policy_path).with_context(|| format!("loading policy at {}", policy_path.display()))?;
+                let violations = engine.evaluate(&capsule)?;
+                if !violations.is_empty() {
+                    for v in &violations {
+                        eprintln!("POLICY [{}] {}", v.rule, v.message);
+                    }
+                    anyhow::bail!("refusing to register: capsule violates {} policy rule(s)", violations.len());
+                }
+            }
             let record = registry.register(&capsule, &actor)?;
             println!("registered {}@{} [{:?}] content_hash={}", record.logical_id, record.version, record.lifecycle_state, record.content_hash);
         }
@@ -159,9 +196,57 @@ pub fn run(db: &Path, action: RegistryCommand) -> Result<()> {
             }
             println!("imported {imported}, skipped (already present) {skipped}, failed {failed}");
         }
+        RegistryCommand::Backup { out, encrypt_key_file } => {
+            match &encrypt_key_file {
+                Some(key_file) => {
+                    let key = fs::read_to_string(key_file).with_context(|| format!("reading {}", key_file.display()))?;
+                    let plain_tmp = tmp_path(&out);
+                    registry.backup_to(&plain_tmp).with_context(|| format!("writing backup to {}", plain_tmp.display()))?;
+                    crypto::encrypt_file(key.trim(), &plain_tmp, &out)?;
+                    fs::remove_file(&plain_tmp).ok();
+                    println!("backed up (encrypted) -> {}", out.display());
+                }
+                None => {
+                    registry.backup_to(&out).with_context(|| format!("writing backup to {}", out.display()))?;
+                    println!("backed up -> {}", out.display());
+                }
+            }
+        }
+        RegistryCommand::Restore { backup, out, decrypt_key_file } => {
+            if out.exists() {
+                anyhow::bail!("{} already exists; refusing to overwrite a restore target", out.display());
+            }
+            match &decrypt_key_file {
+                Some(key_file) => {
+                    let key = fs::read_to_string(key_file).with_context(|| format!("reading {}", key_file.display()))?;
+                    crypto::decrypt_file(key.trim(), &backup, &out)?;
+                }
+                None => {
+                    fs::copy(&backup, &out).with_context(|| format!("copying {} to {}", backup.display(), out.display()))?;
+                }
+            }
+            let restored = Registry::open(&out)?;
+            let count = restored.list_logical_ids()?.len();
+            println!("restored {} logical id(s) -> {}", count, out.display());
+        }
+        RegistryCommand::AuditExport { out } => {
+            let mut file = fs::File::create(&out).with_context(|| format!("creating {}", out.display()))?;
+            let events = registry.audit_log_all()?;
+            for event in &events {
+                writeln!(file, "{}", serde_json::to_string(event)?)?;
+            }
+            println!("exported {} audit event(s) -> {}", events.len(), out.display());
+        }
     }
 
     Ok(())
+}
+
+fn tmp_path(dest: &Path) -> PathBuf {
+    let mut tmp = dest.to_path_buf();
+    let file_name = format!("{}.plaintext-tmp", dest.file_name().and_then(|n| n.to_str()).unwrap_or("backup"));
+    tmp.set_file_name(file_name);
+    tmp
 }
 
 /// Registers one exported capsule document, forcing it to `draft` first

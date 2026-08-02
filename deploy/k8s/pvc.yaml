@@ -1,0 +1,15 @@
+# SQLite is a single-writer, single-file database — capsule-api's
+# Deployment below must stay at replicas=1, so ReadWriteOnce is
+# sufficient (and correct: ReadWriteMany would let a second pod schedule
+# and corrupt-by-concurrent-write against the same file).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: capsuledb-data
+  namespace: capsuledb
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

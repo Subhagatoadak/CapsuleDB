@@ -1,0 +1,62 @@
+# replicas is pinned to 1 and Recreate is used instead of the default
+# RollingUpdate strategy: capsule-api's backing SQLite file is
+# single-writer, so two pods holding the same PersistentVolumeClaim at
+# once (which RollingUpdate briefly does) would mean two processes
+# writing the same file concurrently. Recreate tears the old pod down
+# fully before the new one starts, which costs a brief outage on
+# rollout but keeps the writer count at 1 the whole time.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capsule-api
+  namespace: capsuledb
+  labels:
+    app: capsule-api
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: capsule-api
+  template:
+    metadata:
+      labels:
+        app: capsule-api
+    spec:
+      containers:
+        - name: capsule-api
+          image: capsuledb/capsule-api:latest
+          args: ["--db", "/data/capsuledb.sqlite3", "--addr", "0.0.0.0:8089"]
+          ports:
+            - containerPort: 8089
+              name: http
+          env:
+            - name: RUST_LOG
+              value: capsule_api=info
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8089
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8089
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: capsuledb-data

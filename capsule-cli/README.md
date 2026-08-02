@@ -41,6 +41,11 @@ capsule registry --db capsules.sqlite3 evidence some-source-id
 capsule registry --db capsules.sqlite3 audit --limit 20
 capsule registry --db capsules.sqlite3 export --out capsules.jsonl
 capsule registry --db other.sqlite3 import capsules.jsonl --actor bulk-import
+capsule registry --db capsules.sqlite3 register draft.json --actor alice --policy policy.json
+capsule registry --db capsules.sqlite3 backup --out backup.sqlite3
+capsule registry --db capsules.sqlite3 backup --out backup.enc --encrypt-key-file datakey.hex
+capsule registry --db capsules.sqlite3 restore backup.enc --out restored.sqlite3 --decrypt-key-file datakey.hex
+capsule registry --db capsules.sqlite3 audit-export --out audit.jsonl
 ```
 
 `register` requires the capsule to be `lifecycle_state: draft` — the
@@ -58,6 +63,22 @@ since lifecycle state and governance are excluded from the content hash
 (spec §2.3) and can be re-derived without changing the capsule's
 identity. Auto-supersession from `publish` is not replayed; import uses
 plain transitions.
+
+`register --policy policy.json` runs a [`capsule-policy`](../capsule-policy/README.md)
+rule set against the capsule before registering, and refuses (non-zero
+exit, no write) on any violation. Policy is a deployment-specific layer
+on top of protocol validation — e.g. a domain allowlist or a confidence
+ceiling tighter than the spec's own per-basis cap — not a substitute for
+`validate`.
+
+`backup` writes a consistent point-in-time copy of the whole database
+(SQLite's online backup API, safe against a live registry) — the
+disaster-recovery primitive. `--encrypt-key-file` (hex AES-256 key, see
+`capsule datakey` below) encrypts the backup file at rest with AES-256-GCM;
+`restore` is the inverse, decrypting first if `--decrypt-key-file` is
+given. `audit-export` dumps the full, unbounded audit ledger (as opposed
+to `audit`'s bounded newest-first page for display) for compliance
+retention.
 
 ## Compile
 
@@ -103,6 +124,16 @@ Generates an Ed25519 keypair for signing capsule content hashes (see
 with this key is a `capsule-cli` `pack --sign`/`unpack` feature (Phase 9,
 signed publishers).
 
+```bash
+capsule datakey                    # print a hex AES-256 key to stdout
+capsule datakey --out datakey.hex  # write it to a file
+```
+
+Generates a symmetric key for `registry backup --encrypt-key-file` /
+`registry restore --decrypt-key-file` (Phase 10, encryption at rest for
+backups). Unrelated to `keygen`'s Ed25519 keypair — that signs, this
+encrypts.
+
 ## Evaluate
 
 ```bash
@@ -143,6 +174,26 @@ capsule pack-create retention.pack.json --name retention-policy \
 
 capsule pack-resolve retention.pack.json --db capsules.sqlite3
 ```
+
+## Bench
+
+```bash
+capsule bench resolve "privacy review" --db capsules.sqlite3 --domain policy --iterations 100
+capsule bench remote-resolve 127.0.0.1:8089 "privacy review" --iterations 100
+capsule bench compile policy.md --domain policy --topic retention --owner alice --iterations 100
+```
+
+Times `capsule-resolver`'s `resolve()` in-process, `POST /resolve`
+against a *running* `capsule-api` server over a real TCP connection (a
+bare HTTP/1.1 client, no dependency pulled in for it), or
+`capsule-compiler`'s `compile()` — in a tight loop on this machine, and
+prints min/median/mean/p95/max latency. Deliberately not a published
+number anywhere in this repo — resolution and compilation latency
+depend on the registry size, source length, network hop, and hardware,
+so a fixed claim would be misleading; the benchmark tool itself,
+runnable against your own data and your own deployment, is the
+deliverable (Phase 10 roadmap: "benchmark local and remote resolution
+latency" / "benchmark capsule compilation cost").
 
 A Capsule Pack is a named, versioned bundle of capsule *references* —
 the unit the README's Capsule Query Language sketches as `VERIFY answer

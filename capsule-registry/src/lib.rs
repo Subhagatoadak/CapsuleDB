@@ -16,9 +16,11 @@
 
 mod error;
 mod model;
+mod tenant;
 
 pub use error::RegistryError;
 pub use model::*;
+pub use tenant::TenantStore;
 
 use capsule_core::{
     check_transition, content_hash, content_payload, rehydrate, validate, Capsule, Dependency, DependencyRelation,
@@ -449,6 +451,42 @@ impl Registry {
         .collect()
     }
 
+    /// Every audit event ever recorded, oldest first — for a full audit
+    /// export (disaster-recovery / compliance use), as opposed to
+    /// [`Registry::audit_log`]'s newest-first bounded page for display.
+    pub fn audit_log_all(&self) -> Result<Vec<AuditEvent>, RegistryError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT event_type, logical_id, version, actor, detail_json, occurred_at FROM audit_events ORDER BY id ASC")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })?;
+        rows.map(|r| {
+            let (event_type, logical_id, version, actor, detail_json, occurred_at) = r?;
+            let detail = detail_json.map(|d| serde_json::from_str(&d)).transpose()?;
+            Ok(AuditEvent { event_type, logical_id, version, actor, detail, occurred_at })
+        })
+        .collect()
+    }
+
+    /// Writes a consistent, point-in-time copy of the whole database to
+    /// `dest` using SQLite's online backup API — safe to call against a
+    /// live registry with concurrent readers/writers, unlike copying the
+    /// file bytes directly (which can capture a torn write).
+    pub fn backup_to<P: AsRef<Path>>(&self, dest: P) -> Result<(), RegistryError> {
+        let mut dest_conn = Connection::open(dest)?;
+        let backup = rusqlite::backup::Backup::new(&self.conn, &mut dest_conn)?;
+        backup.run_to_completion(5, std::time::Duration::from_millis(250), None)?;
+        Ok(())
+    }
+
     fn find_content_hash(&self, logical_id: &str, version: &str) -> Result<Option<String>, RegistryError> {
         let mut stmt = self.conn.prepare("SELECT content_hash FROM capsule_versions WHERE logical_id = ?1 AND version = ?2")?;
         let mut rows = stmt.query(params![logical_id, version])?;
@@ -788,5 +826,83 @@ mod tests {
         let record = registry.get("kc://a/b/c", "1.0.0").unwrap().unwrap();
         assert_eq!(record.capsule.epistemic_status, EpistemicStatus::Disputed);
         assert_eq!(record.capsule.confidence.basis, ConfidenceBasis::Unsupported);
+    }
+
+    fn tempfile(name: &str) -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        std::env::temp_dir().join(format!("capsule-registry-test-{name}-{}-{nanos}", std::process::id()))
+    }
+
+    #[test]
+    fn backup_to_produces_an_independently_openable_copy_with_all_data() {
+        let mut registry = Registry::open_in_memory().unwrap();
+        let capsule = draft_capsule("kc://policy/retention/ninety-days", "1.0.0", "Retain for 90 days.");
+        registry.register(&capsule, "alice").unwrap();
+        registry.transition("kc://policy/retention/ninety-days", "1.0.0", LifecycleState::InReview, "alice", None).unwrap();
+
+        let backup_path = tempfile("backup.sqlite3");
+        registry.backup_to(&backup_path).unwrap();
+
+        let restored = Registry::open(&backup_path).unwrap();
+        let record = restored.get("kc://policy/retention/ninety-days", "1.0.0").unwrap().unwrap();
+        assert_eq!(record.lifecycle_state, LifecycleState::InReview);
+        let log = restored.audit_log_all().unwrap();
+        assert_eq!(log.len(), 2, "backup must carry the full audit trail, not just current state");
+
+        std::fs::remove_file(&backup_path).ok();
+    }
+
+    #[test]
+    fn audit_log_all_returns_events_oldest_first_unbounded() {
+        let mut registry = Registry::open_in_memory().unwrap();
+        for i in 0..5 {
+            let capsule = draft_capsule(&format!("kc://policy/retention/day-{i}"), "1.0.0", "x");
+            registry.register(&capsule, "alice").unwrap();
+        }
+        let log = registry.audit_log_all().unwrap();
+        assert_eq!(log.len(), 5);
+        // audit_log(limit) is newest-first; audit_log_all is oldest-first.
+        let bounded = registry.audit_log(5).unwrap();
+        assert_eq!(log.first().unwrap().logical_id, bounded.last().unwrap().logical_id);
+    }
+
+    #[test]
+    fn opening_a_corrupted_file_as_a_database_fails_cleanly_instead_of_panicking() {
+        let path = tempfile("corrupt.sqlite3");
+        std::fs::write(&path, b"this is not a sqlite database").unwrap();
+
+        // SQLite only detects the corruption once a real query touches the
+        // file (open() itself just opens the file handle), so the failure
+        // has to be provoked the same way a real caller would hit it.
+        let result = Registry::open(&path).and_then(|r| r.list_logical_ids());
+        assert!(result.is_err(), "a non-database file must error, not panic or silently succeed");
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn concurrent_registration_from_multiple_threads_does_not_corrupt_or_panic() {
+        use std::sync::{Arc, Mutex};
+        let path = tempfile("concurrent.sqlite3");
+        let registry = Arc::new(Mutex::new(Registry::open(&path).unwrap()));
+
+        let handles: Vec<_> = (0..8)
+            .map(|i| {
+                let registry = Arc::clone(&registry);
+                std::thread::spawn(move || {
+                    let capsule = draft_capsule(&format!("kc://policy/concurrent/item-{i}"), "1.0.0", "x");
+                    registry.lock().unwrap().register(&capsule, "alice").unwrap();
+                })
+            })
+            .collect();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let registry = registry.lock().unwrap();
+        assert_eq!(registry.list_logical_ids().unwrap().len(), 8, "every concurrent writer's registration must land");
+
+        drop(registry);
+        std::fs::remove_file(&path).ok();
     }
 }

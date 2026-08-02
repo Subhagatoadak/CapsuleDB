@@ -60,3 +60,21 @@ Tested with real end-to-end HTTP requests over `TcpStream` (see
 anonymous request against a role-restricted capsule, a 400 for an
 invalid capsule, a CORS preflight check, and a regression test for the
 cache-staleness bug above.
+
+## Observability
+
+Every request gets a `tracing` span (`method`, `path`) and one log line
+on completion (`status`, `elapsed_ms`) — `INFO` for 2xx/3xx, `WARN` for
+4xx, `ERROR` for 5xx. Controlled by `RUST_LOG` (defaults to
+`capsule_api=info`):
+
+```bash
+RUST_LOG=capsule_api=debug cargo run -p capsule-api -- --db capsules.sqlite3
+```
+
+This is `tracing`'s structured logging, not a full OpenTelemetry exporter
+— there is no OTLP collector to honestly test an exporter against in
+this environment. The span/event structure is the OTel-compatible part:
+wiring `tracing-opentelemetry`'s subscriber layer in `main.rs` in place
+of (or alongside) `tracing_subscriber::fmt` is the rest, without
+touching the instrumentation in `lib.rs`.

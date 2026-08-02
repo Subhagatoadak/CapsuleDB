@@ -351,6 +351,202 @@ fn pack_resolve_fails_when_a_member_is_unpublished() {
     assert!(String::from_utf8_lossy(&resolve.stdout).contains("not found"));
 }
 
+#[test]
+fn bench_remote_resolve_prints_latency_stats_against_a_live_server() {
+    let registry = capsule_registry::Registry::open_in_memory().unwrap();
+    let (addr, _handle) = capsule_api::Server::new(registry).spawn_background().unwrap();
+
+    let out = Command::new(capsule_bin())
+        .args(["bench", "remote-resolve"])
+        .arg(addr.to_string())
+        .args(["privacy review", "--iterations", "5"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("n=5"), "expected iteration count in output, got: {stdout}");
+    assert!(stdout.contains("POST /resolve"));
+}
+
+#[test]
+fn bench_compile_prints_latency_stats_for_a_real_source() {
+    let out = Command::new(capsule_bin())
+        .args(["bench", "compile"])
+        .arg(repo_root().join("docs/specification/knowledge-capsule-spec.md"))
+        .args(["--domain", "policy", "--topic", "retention", "--owner", "alice", "--iterations", "5"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("n=5"), "expected iteration count in output, got: {stdout}");
+    assert!(stdout.contains("median="));
+}
+
+#[test]
+fn bench_resolve_prints_latency_stats_against_a_populated_registry() {
+    let dir = tempdir();
+    let mut draft: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(repo_root().join("examples/capsules/data-retention-90-days.json")).unwrap()).unwrap();
+    draft["lifecycle_state"] = serde_json::Value::String("draft".to_string());
+    let draft_path = dir.join("draft.json");
+    fs::write(&draft_path, serde_json::to_string_pretty(&draft).unwrap()).unwrap();
+    let logical_id = draft["logical_id"].as_str().unwrap().to_string();
+
+    let db = dir.join("registry.sqlite3");
+    let registry_run = |args: &[&str]| -> std::process::Output {
+        Command::new(capsule_bin()).arg("registry").arg("--db").arg(&db).args(args).output().unwrap()
+    };
+    assert!(registry_run(&["register", draft_path.to_str().unwrap(), "--actor", "alice"]).status.success());
+    assert!(registry_run(&["transition", &logical_id, "1.0.0", "in_review", "--actor", "alice"]).status.success());
+    assert!(registry_run(&["transition", &logical_id, "1.0.0", "approved", "--actor", "alice"]).status.success());
+    assert!(registry_run(&["publish", &logical_id, "1.0.0", "--actor", "alice"]).status.success());
+
+    let out = Command::new(capsule_bin())
+        .args(["bench", "resolve", "privacy review", "--db"])
+        .arg(&db)
+        .args(["--domain", "policy", "--iterations", "10"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("n=10"), "expected iteration count in output, got: {stdout}");
+}
+
+#[test]
+fn registry_register_with_policy_refuses_a_violating_capsule_but_allows_a_clean_one() {
+    let dir = tempdir();
+    let mut draft: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(repo_root().join("examples/capsules/data-retention-90-days.json")).unwrap()).unwrap();
+    draft["lifecycle_state"] = serde_json::Value::String("draft".to_string());
+    let draft_path = dir.join("draft.json");
+    fs::write(&draft_path, serde_json::to_string_pretty(&draft).unwrap()).unwrap();
+
+    let policy_path = dir.join("policy.json");
+    let declared_domain = draft["governance"]["domain"].as_str().unwrap().to_string();
+    fs::write(&policy_path, format!(r#"{{"rules": [{{"type": "allowed_domains", "domains": ["not-{declared_domain}"]}}]}}"#)).unwrap();
+
+    let db = dir.join("registry.sqlite3");
+    let reject = Command::new(capsule_bin())
+        .arg("registry")
+        .arg("--db")
+        .arg(&db)
+        .args(["register"])
+        .arg(&draft_path)
+        .args(["--actor", "alice", "--policy"])
+        .arg(&policy_path)
+        .output()
+        .unwrap();
+    assert!(!reject.status.success());
+    assert!(String::from_utf8_lossy(&reject.stderr).contains("allowed_domains"));
+
+    let allow_policy_path = dir.join("allow.json");
+    fs::write(&allow_policy_path, format!(r#"{{"rules": [{{"type": "allowed_domains", "domains": ["{declared_domain}"]}}]}}"#)).unwrap();
+    let accept = Command::new(capsule_bin())
+        .arg("registry")
+        .arg("--db")
+        .arg(&db)
+        .args(["register"])
+        .arg(&draft_path)
+        .args(["--actor", "alice", "--policy"])
+        .arg(&allow_policy_path)
+        .output()
+        .unwrap();
+    assert!(accept.status.success(), "{}", String::from_utf8_lossy(&accept.stderr));
+}
+
+#[test]
+fn registry_backup_and_restore_round_trip_with_encryption() {
+    let dir = tempdir();
+    let mut draft: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(repo_root().join("examples/capsules/data-retention-90-days.json")).unwrap()).unwrap();
+    draft["lifecycle_state"] = serde_json::Value::String("draft".to_string());
+    let draft_path = dir.join("draft.json");
+    fs::write(&draft_path, serde_json::to_string_pretty(&draft).unwrap()).unwrap();
+    let logical_id = draft["logical_id"].as_str().unwrap().to_string();
+
+    let db = dir.join("registry.sqlite3");
+    let registry_run = |args: &[&str]| -> std::process::Output {
+        Command::new(capsule_bin()).arg("registry").arg("--db").arg(&db).args(args).output().unwrap()
+    };
+    assert!(registry_run(&["register", draft_path.to_str().unwrap(), "--actor", "alice"]).status.success());
+
+    let key_path = dir.join("data.key");
+    let datakey = Command::new(capsule_bin()).args(["datakey", "--out"]).arg(&key_path).output().unwrap();
+    assert!(datakey.status.success(), "{}", String::from_utf8_lossy(&datakey.stderr));
+    assert!(key_path.exists());
+
+    let backup_path = dir.join("backup.enc");
+    let backup = registry_run(&["backup", "--out", backup_path.to_str().unwrap(), "--encrypt-key-file", key_path.to_str().unwrap()]);
+    assert!(backup.status.success(), "{}", String::from_utf8_lossy(&backup.stderr));
+    assert_ne!(fs::read(&backup_path).unwrap(), fs::read(&db).unwrap(), "backup must actually be encrypted, not a plain copy");
+
+    let restored_path = dir.join("restored.sqlite3");
+    let restore = Command::new(capsule_bin())
+        .args(["registry", "--db"])
+        .arg(&db) // --db is required by the global arg but unused by `restore`
+        .args(["restore"])
+        .arg(&backup_path)
+        .args(["--out"])
+        .arg(&restored_path)
+        .args(["--decrypt-key-file"])
+        .arg(&key_path)
+        .output()
+        .unwrap();
+    assert!(restore.status.success(), "{}", String::from_utf8_lossy(&restore.stderr));
+
+    let get = Command::new(capsule_bin()).args(["registry", "--db"]).arg(&restored_path).args(["get", &logical_id, "1.0.0"]).output().unwrap();
+    assert!(get.status.success());
+    assert!(String::from_utf8_lossy(&get.stdout).contains(&logical_id));
+
+    // Restoring with the wrong key must fail loudly, not silently produce garbage.
+    let wrong_key_path = dir.join("wrong.key");
+    let wrong_key_gen = Command::new(capsule_bin()).args(["datakey", "--out"]).arg(&wrong_key_path).output().unwrap();
+    assert!(wrong_key_gen.status.success());
+    let bad_restore_path = dir.join("bad-restore.sqlite3");
+    let bad_restore = Command::new(capsule_bin())
+        .args(["registry", "--db"])
+        .arg(&db)
+        .args(["restore"])
+        .arg(&backup_path)
+        .args(["--out"])
+        .arg(&bad_restore_path)
+        .args(["--decrypt-key-file"])
+        .arg(&wrong_key_path)
+        .output()
+        .unwrap();
+    assert!(!bad_restore.status.success());
+}
+
+#[test]
+fn registry_audit_export_dumps_the_full_ledger() {
+    let dir = tempdir();
+    let mut draft: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(repo_root().join("examples/capsules/data-retention-90-days.json")).unwrap()).unwrap();
+    draft["lifecycle_state"] = serde_json::Value::String("draft".to_string());
+    let draft_path = dir.join("draft.json");
+    fs::write(&draft_path, serde_json::to_string_pretty(&draft).unwrap()).unwrap();
+    let logical_id = draft["logical_id"].as_str().unwrap().to_string();
+
+    let db = dir.join("registry.sqlite3");
+    let registry_run = |args: &[&str]| -> std::process::Output {
+        Command::new(capsule_bin()).arg("registry").arg("--db").arg(&db).args(args).output().unwrap()
+    };
+    assert!(registry_run(&["register", draft_path.to_str().unwrap(), "--actor", "alice"]).status.success());
+    assert!(registry_run(&["transition", &logical_id, "1.0.0", "in_review", "--actor", "alice"]).status.success());
+
+    let out_path = dir.join("audit.jsonl");
+    let export = registry_run(&["audit-export", "--out", out_path.to_str().unwrap()]);
+    assert!(export.status.success(), "{}", String::from_utf8_lossy(&export.stderr));
+    assert!(String::from_utf8_lossy(&export.stdout).contains("exported 2"));
+
+    let lines: Vec<String> = fs::read_to_string(&out_path).unwrap().lines().map(|l| l.to_string()).collect();
+    assert_eq!(lines.len(), 2);
+    let first: serde_json::Value = serde_json::from_str(&lines[0]).unwrap();
+    assert_eq!(first["event_type"], "register");
+    let second: serde_json::Value = serde_json::from_str(&lines[1]).unwrap();
+    assert_eq!(second["event_type"], "transition");
+}
+
 fn tempdir() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

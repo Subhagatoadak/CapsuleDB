@@ -1,4 +1,6 @@
+mod bench_cmd;
 mod compile_cmd;
+mod crypto;
 mod evaluate_cmd;
 mod observatory_cmd;
 mod pack_list_cmd;
@@ -154,6 +156,59 @@ enum Command {
         #[arg(long, default_value = "capsuledb.sqlite3")]
         db: PathBuf,
     },
+    /// Generate a random AES-256 key for `registry backup --encrypt-key-file`.
+    Datakey {
+        /// Write the hex key to this file instead of printing to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Measure resolution latency or compilation cost on this machine (no fixed numbers claimed anywhere else).
+    Bench {
+        #[command(subcommand)]
+        action: BenchCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum BenchCommand {
+    /// Time `capsule-resolver`'s resolve() against a registry.
+    Resolve {
+        #[arg(long, default_value = "capsuledb.sqlite3")]
+        db: PathBuf,
+        purpose: String,
+        #[arg(long)]
+        domain: Option<String>,
+        #[arg(long)]
+        about: Option<String>,
+        #[arg(long)]
+        jurisdiction: Option<String>,
+        #[arg(long)]
+        consumer_role: Option<String>,
+        #[arg(long, default_value_t = 100)]
+        iterations: u32,
+    },
+    /// Time `POST /resolve` against a running capsule-api server over real HTTP (the "remote" half of the roadmap's latency benchmark).
+    RemoteResolve {
+        /// capsule-api address, e.g. 127.0.0.1:8089.
+        addr: String,
+        purpose: String,
+        #[arg(long, default_value_t = 100)]
+        iterations: u32,
+    },
+    /// Time `capsule-compiler`'s compile() against a source document.
+    Compile {
+        source: PathBuf,
+        #[arg(long, value_enum)]
+        format: Option<SourceFormatArg>,
+        #[arg(long)]
+        domain: String,
+        #[arg(long)]
+        topic: String,
+        #[arg(long)]
+        owner: String,
+        #[arg(long, default_value_t = 100)]
+        iterations: u32,
+    },
 }
 
 fn main() -> Result<()> {
@@ -173,7 +228,29 @@ fn main() -> Result<()> {
         Command::Observatory { db, freshness_days, knowledge_debt_days } => observatory_cmd::run_cmd(&db, freshness_days, knowledge_debt_days),
         Command::PackCreate { output, name, description, members } => pack_list_cmd::create(&output, &name, description.as_deref(), members),
         Command::PackResolve { pack_file, db } => pack_list_cmd::resolve(&pack_file, &db),
+        Command::Datakey { out } => cmd_datakey(out.as_deref()),
+        Command::Bench { action } => match action {
+            BenchCommand::Resolve { db, purpose, domain, about, jurisdiction, consumer_role, iterations } => {
+                bench_cmd::run_resolve(&db, &purpose, domain, about, jurisdiction, consumer_role, iterations)
+            }
+            BenchCommand::Compile { source, format, domain, topic, owner, iterations } => {
+                bench_cmd::run_compile(&source, format, &domain, &topic, &owner, iterations)
+            }
+            BenchCommand::RemoteResolve { addr, purpose, iterations } => bench_cmd::run_remote_resolve(&addr, &purpose, iterations),
+        },
     }
+}
+
+fn cmd_datakey(out: Option<&Path>) -> Result<()> {
+    let key = crypto::generate_key_hex();
+    match out {
+        Some(path) => {
+            fs::write(path, &key)?;
+            println!("wrote data encryption key -> {}", path.display());
+        }
+        None => println!("data_key: {key}"),
+    }
+    Ok(())
 }
 
 fn cmd_keygen(out_prefix: Option<&Path>) -> Result<()> {

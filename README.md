@@ -446,20 +446,20 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 
 ## Phase 10 — Scale and enterprise readiness
 
-- [ ] Benchmark local and remote resolution latency
-- [ ] Benchmark capsule compilation cost
-- [ ] Benchmark deterministic versus LLM evaluation coverage
-- [ ] Add tenant isolation
-- [ ] Add enterprise identity integration
-- [ ] Add encryption and key management
-- [ ] Add regional deployment support
-- [ ] Add backup and disaster recovery
-- [ ] Add audit export
-- [ ] Add policy-as-code support
-- [ ] Add Kubernetes deployment manifests
-- [ ] Add OpenTelemetry observability
-- [ ] Add security threat model
-- [ ] Add performance and resilience testing
+- [x] Benchmark local and remote resolution latency (`capsule bench resolve` times `capsule-resolver::resolve()` in-process; `capsule bench remote-resolve` times `POST /resolve` against a running `capsule-api` over real HTTP — no fixed numbers published anywhere, since latency depends on registry size and hardware; the runnable tool is the deliverable)
+- [x] Benchmark capsule compilation cost (`capsule bench compile`, same tool, against `capsule-compiler::compile()`)
+- [ ] Benchmark deterministic versus LLM evaluation coverage (no LLM judge exists to benchmark against — see Phase 6's `NullJudge`; nothing to honestly compare)
+- [x] Add tenant isolation (`capsule_registry::TenantStore`: one SQLite file per tenant rather than a shared-schema `tenant_id` column, so a missed `WHERE` clause can't leak across tenants — see `capsule-registry/README.md`)
+- [ ] Add enterprise identity integration (no real IdP to integrate against in this environment; `capsule-api` has no auth layer of its own by design — see `docs/security/threat-model.md`)
+- [x] Add encryption and key management (Ed25519 signing key management via `capsule keygen`, already Phase 9; AES-256-GCM backup encryption and `capsule datakey` added this phase — `registry backup --encrypt-key-file`/`restore --decrypt-key-file`)
+- [ ] Add regional deployment support (the Kubernetes manifests in `deploy/k8s/` are deployable per region by an operator, but there's no region-aware routing, data-residency enforcement, or multi-region replication built here)
+- [x] Add backup and disaster recovery (`Registry::backup_to`, SQLite's online backup API for a consistent live copy; `capsule registry backup`/`restore`, optionally AES-256-GCM-encrypted at rest)
+- [x] Add audit export (`Registry::audit_log_all` + `capsule registry audit-export`: the full, unbounded ledger to JSONL, distinct from Phase 9's capsule-content `export`/`import`)
+- [x] Add policy-as-code support (new [`capsule-policy`](capsule-policy) crate: JSON-configured rules — domain allowlist, per-basis confidence-ceiling tightening, owner pattern, evidence minimums, forbidden phrasing — enforced via `capsule registry register --policy`)
+- [x] Add Kubernetes deployment manifests (`deploy/Dockerfile` + `deploy/k8s/*.yaml`; the Docker image was actually built and run in this environment against a live container, `replicas: 1`/`Recreate` pinned because SQLite is single-writer — see `deploy/README.md` for exactly what was and wasn't verified)
+- [x] Add OpenTelemetry observability (`tracing` spans and structured per-request logs — method/path/status/latency — in `capsule-api`, `RUST_LOG`-controlled; the span/event structure is OTel-compatible, but no OTLP exporter is wired in — there's no collector in this environment to honestly test one against, see `capsule-api/README.md`)
+- [x] Add security threat model ([`docs/security/threat-model.md`](docs/security/threat-model.md) — assets, trust boundaries per component, current mitigations, and explicitly what's out of scope, matching what's actually implemented rather than an aspirational posture)
+- [x] Add performance and resilience testing (`capsule-registry`: corrupted-file-open fails cleanly rather than panicking, concurrent multi-threaded registration doesn't corrupt data — both regression-tested)
 
 ## First demonstrator
 
@@ -501,7 +501,7 @@ CapsuleDB/
 
 ## Current status
 
-Phases 0-9 are implemented:
+Phases 0-10 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
@@ -516,10 +516,18 @@ Phases 0-9 are implemented:
 - `capsule-studio` is a single static `index.html` (no build step) driving `capsule-api` from a browser: inspection, evidence/confidence/contradiction viewers, dependency lookups, the approval workflow, resolution, and evaluation reports. Driven end to end in a real headless-Chromium session, which caught and led to fixing a genuine bug — `GET /capsule` was serving a stale cached copy after a transition, because the mutating endpoints wrote to the registry without invalidating `capsule-runtime`'s cache.
 - `capsule-observatory` runs registry-wide health checks: freshness, unresolved contradictions, orphaned capsules, broken dependencies, confidence-laundering incidents, knowledge debt, expiry alerts, and the capsule reuse ratio.
 - `connector-sdk` defines the `SourceConnector` trait that feeds `capsule-compiler`, with a real filesystem implementation; `capsule-cli` gained `pack --sign`/`unpack --verify-key` (Ed25519 signed publishers), `registry export`/`import` (bulk migration, replaying lifecycle state), and `pack-create`/`pack-resolve` (Capsule Packs — named bundles of registry references).
+- `capsule_registry::TenantStore` gives each tenant an isolated SQLite file under a shared base directory, sanitizing tenant IDs against path traversal — structural isolation instead of a `tenant_id` column threaded through every one of the five crates built on `Registry`.
+- `Registry::backup_to` (SQLite's online backup API) and `Registry::audit_log_all` back new `capsule registry backup`/`restore`/`audit-export` commands; `capsule datakey` plus AES-256-GCM give backups optional encryption at rest, alongside Phase 9's Ed25519 signing for capsule/package authenticity.
+- The new [`capsule-policy`](capsule-policy) crate enforces deployment-specific JSON-configured rules (domain allowlists, tightened confidence ceilings, owner patterns, evidence minimums, forbidden phrasing) at `capsule registry register --policy` time, layered on top of protocol validation rather than replacing it.
+- `capsule bench resolve`/`remote-resolve`/`compile` measure resolution and compilation latency on your own machine and data, in-process and over real HTTP against a running `capsule-api` — deliberately no fixed numbers published in this repo, since that would misrepresent hardware- and data-dependent latency as a portable claim.
+- `capsule-api` gained per-request `tracing` spans and structured logs (method/path/status/latency, `RUST_LOG`-controlled) — OTel-compatible span structure, though no OTLP exporter is wired in (no collector in this environment to honestly test one against).
+- `deploy/Dockerfile` and `deploy/k8s/*.yaml` package `capsule-api` for containerized deployment; the Docker image was actually built and run against a live container in this environment (not just written and assumed to work), with the Kubernetes Deployment pinned to `replicas: 1`/`Recreate` because the SQLite backend is single-writer.
+- [`docs/security/threat-model.md`](docs/security/threat-model.md) documents assets, trust boundaries, current mitigations, and explicit gaps (no auth on `capsule-api`, no enterprise identity integration) — matching the implementation as built, not an aspirational target.
+- `capsule-registry` gained resilience tests: opening a corrupted file fails cleanly instead of panicking, and concurrent multi-threaded registration doesn't corrupt data.
 
 Building all of this surfaced and fixed three real bugs from earlier phases, each caught by actually exercising the system rather than by inspection: the content hash originally covered identity fields, making the spec's own cross-logical-ID dedup claim impossible (fixed in Phase 2); the resolver treated an anonymous request as bypassing permission checks entirely rather than as unprivileged (fixed while building Phase 5, alongside correcting the Phase 0 example capsules and spec wording that had conflated permission *roles* with capability *verbs*); and `capsule-api`'s mutating routes wrote straight to the registry without invalidating `capsule-runtime`'s cache, so a capsule fetched once would appear stuck at its first-seen lifecycle state forever (found by driving Capsule Studio in a real browser against a live server, fixed in Phase 7).
 
-Phase 10 (Scale and enterprise readiness) has not started. See the roadmap below for what's next.
+All 10 roadmap phases now have working code behind every checked box; the boxes left unchecked (LLM-judge evaluation coverage, enterprise identity integration, regional deployment support, a handful of smaller items within earlier phases) stay that way because building them honestly needs something this environment doesn't have — a real LLM judge, a real identity provider, a real multi-region cluster — not because they were skipped. See the roadmap above for the full, per-item accounting.
 
 ---
 

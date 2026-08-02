@@ -86,8 +86,11 @@ impl Server {
     }
 
     fn handle(&self, mut request: tiny_http::Request) {
+        let start = std::time::Instant::now();
         let (path, query) = split_url(request.url());
         let method = request.method().clone();
+        let span = tracing::info_span!("request", method = %method, path = %path);
+        let _entered = span.enter();
 
         if method == Method::Options {
             let _ = request.respond(cors_preflight_response());
@@ -112,6 +115,15 @@ impl Server {
         };
 
         let response = result.unwrap_or_else(|e| json_response(500, &json!({ "error": e })));
+        let status = response.status_code().0;
+        let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+        if status >= 500 {
+            tracing::error!(status, elapsed_ms, "request failed");
+        } else if status >= 400 {
+            tracing::warn!(status, elapsed_ms, "request rejected");
+        } else {
+            tracing::info!(status, elapsed_ms, "request handled");
+        }
         let _ = request.respond(response);
     }
 
