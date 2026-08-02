@@ -126,6 +126,7 @@ name = "capsule-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "capsule-compiler",
  "capsule-core",
  "capsule-registry",
  "chrono",
@@ -135,6 +136,16 @@ dependencies = [
  "serde_json",
  "sha2",
  "tar",
+]
+
+[[package]]
+name = "capsule-compiler"
+version = "0.1.0"
+dependencies = [
+ "capsule-core",
+ "chrono",
+ "regex",
+ "thiserror",
 ]
 
 [[package]]

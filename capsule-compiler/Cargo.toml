@@ -1,0 +1,13 @@
+[package]
+name = "capsule-compiler"
+description = "Deterministic source-to-candidate-capsule pipeline for CapsuleDB (Phase 3 MVP: no LLM step yet)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+capsule-core = { path = "../capsule-core" }
+regex.workspace = true
+chrono.workspace = true
+thiserror.workspace = true

@@ -147,6 +147,44 @@ fn registry_register_transition_publish_and_get_round_trip() {
     assert!(!skip_state.status.success());
 }
 
+#[test]
+fn compile_extracts_candidates_and_writes_valid_draft_json() {
+    let dir = tempdir();
+    let source_path = dir.join("policy.txt");
+    fs::write(
+        &source_path,
+        "Data must be retained for 90 days unless a legal hold applies.\n\nData must be retained for 90 days unless a legal hold applies.",
+    )
+    .unwrap();
+
+    let out_dir = dir.join("drafts");
+    let output = Command::new(capsule_bin())
+        .args([
+            "compile",
+            source_path.to_str().unwrap(),
+            "--domain",
+            "policy",
+            "--topic",
+            "retention",
+            "--owner",
+            "alice",
+            "--out-dir",
+        ])
+        .arg(&out_dir)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("1 candidate(s), 1 duplicate(s) skipped"));
+
+    let draft_path = out_dir.join("001.json");
+    assert!(draft_path.exists());
+
+    let validate = Command::new(capsule_bin()).args(["validate", draft_path.to_str().unwrap()]).output().unwrap();
+    assert!(validate.status.success(), "{}", String::from_utf8_lossy(&validate.stderr));
+}
+
 fn tempdir() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

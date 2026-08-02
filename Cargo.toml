@@ -4,6 +4,7 @@ members = [
     "capsule-core",
     "capsule-cli",
     "capsule-registry",
+    "capsule-compiler",
 ]
 
 [workspace.package]

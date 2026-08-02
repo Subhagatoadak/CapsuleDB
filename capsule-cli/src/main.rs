@@ -1,8 +1,10 @@
+mod compile_cmd;
 mod registry_cmd;
 
 use anyhow::{bail, Context, Result};
 use capsule_core::{content_hash, is_valid, parse, validate, Capsule, Severity};
 use clap::{Parser, Subcommand};
+use compile_cmd::SourceFormatArg;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -59,6 +61,23 @@ enum Command {
         #[command(subcommand)]
         action: RegistryCommand,
     },
+    /// Compile a source document into candidate draft capsules (deterministic, no LLM step).
+    Compile {
+        /// Path to the source document.
+        source: PathBuf,
+        /// Source format; inferred from the file extension if omitted.
+        #[arg(long, value_enum)]
+        format: Option<SourceFormatArg>,
+        #[arg(long)]
+        domain: String,
+        #[arg(long)]
+        topic: String,
+        #[arg(long)]
+        owner: String,
+        /// Directory to write one JSON draft capsule per extracted claim.
+        #[arg(long, default_value = "draft-capsules")]
+        out_dir: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -69,6 +88,7 @@ fn main() -> Result<()> {
         Command::Pack { capsule, output, evidence_dir } => cmd_pack(&capsule, &output, evidence_dir.as_deref()),
         Command::Unpack { package, output } => cmd_unpack(&package, &output),
         Command::Registry { db, action } => registry_cmd::run(&db, action),
+        Command::Compile { source, format, domain, topic, owner, out_dir } => compile_cmd::run(&source, format, &domain, &topic, &owner, &out_dir),
     }
 }
 

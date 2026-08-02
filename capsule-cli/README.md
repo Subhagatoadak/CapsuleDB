@@ -44,3 +44,18 @@ illustrating the spec, so set `lifecycle_state` to `draft` before
 registering a copy of one. `publish` auto-supersedes any `supersedes`
 dependency target that is currently `published` (see
 `capsule-registry/README.md`).
+
+## Compile
+
+```bash
+capsule compile policy.md --domain policy --topic retention --owner alice --out-dir drafts/
+```
+
+Extracts one draft candidate capsule per sentence from a text/Markdown/HTML
+source (`--format` overrides extension-based detection), writes each as
+`drafts/NNN.json`, and prints per-candidate epistemic classification,
+detected qualifications/exclusions/conditions, bare `kc://` references
+(not auto-wired as dependencies), and the deterministic validation issues
+already run against each candidate — see `capsule-compiler/README.md`.
+A typical next step is `capsule registry register drafts/001.json --actor
+you` once you've reviewed a candidate.
