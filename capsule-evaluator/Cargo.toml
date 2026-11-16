@@ -1,0 +1,21 @@
+[package]
+name = "capsule-evaluator"
+description = "Epistemic evaluation of answers against Knowledge Capsule contracts: deterministic detectors first, a bounded LLM judge only for residual questions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+capsule-core = { path = "../capsule-core" }
+capsule-compiler = { path = "../capsule-compiler" }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+regex.workspace = true
+semver.workspace = true
+thiserror.workspace = true
+ureq.workspace = true
+
+[dev-dependencies]
+tiny_http.workspace = true

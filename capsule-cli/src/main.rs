@@ -1,4 +1,6 @@
 mod compile_cmd;
+mod evaluate_cmd;
+mod resolve_cmd;
 mod registry_cmd;
 
 use anyhow::{bail, Context, Result};
@@ -78,6 +80,12 @@ enum Command {
         #[arg(long, default_value = "draft-capsules")]
         out_dir: PathBuf,
     },
+    /// Evaluate an answer against capsule contracts (deterministic checks
+    /// first; a bounded judge only for residual questions).
+    Evaluate(evaluate_cmd::EvaluateArgs),
+    /// Resolve capsules for a purpose (CQL or a JSON request) into a
+    /// bundle with an inspectable plan; or replay a recorded bundle.
+    Resolve(resolve_cmd::ResolveArgs),
 }
 
 fn main() -> Result<()> {
@@ -89,6 +97,8 @@ fn main() -> Result<()> {
         Command::Unpack { package, output } => cmd_unpack(&package, &output),
         Command::Registry { db, action } => registry_cmd::run(&db, action),
         Command::Compile { source, format, domain, topic, owner, out_dir } => compile_cmd::run(&source, format, &domain, &topic, &owner, &out_dir),
+        Command::Evaluate(args) => evaluate_cmd::run(args),
+        Command::Resolve(args) => resolve_cmd::run(args),
     }
 }
 

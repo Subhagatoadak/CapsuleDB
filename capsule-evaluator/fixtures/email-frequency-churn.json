@@ -1,0 +1,38 @@
+{
+  "schema_version": "kcp/0.1",
+  "logical_id": "kc://marketing/retention/email-frequency-churn",
+  "version": "1.0.0",
+  "capsule_type": "interpretation",
+  "statement": "Higher weekly email frequency is associated with lower subscriber churn in the 2025 cohort analysis.",
+  "epistemic_status": "inferred",
+  "confidence": {
+    "basis": "statistical_inference",
+    "ceiling": 0.5,
+    "rationale": "Observational cohort comparison; engaged subscribers may both open more email and churn less."
+  },
+  "lifecycle_state": "published",
+  "evidence": [
+    {
+      "source_id": "crm-cohort-analysis-2025",
+      "span": "section 3",
+      "excerpt": "Subscribers receiving 3+ emails per week were associated with 12% lower churn (observational, not randomized).",
+      "authority": "secondary",
+      "retrieved_at": "2026-02-01T00:00:00Z"
+    }
+  ],
+  "applicability": {
+    "jurisdictions": [],
+    "valid_from": "2025-01-01",
+    "valid_until": null,
+    "conditions": ["applies to newsletter subscribers"],
+    "exclusions": ["not tested for transactional email"]
+  },
+  "contradictions": [],
+  "dependencies": [],
+  "governance": { "owner": "lifecycle-marketing", "domain": "marketing", "permissions": ["read"] },
+  "evaluation_contract": {
+    "mandatory_qualifications": ["observational association"],
+    "prohibited_overclaims": ["more email reduces churn"],
+    "evaluation_rules": ["answers must not present the association as a causal effect"]
+  }
+}
