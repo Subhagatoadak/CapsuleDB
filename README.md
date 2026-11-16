@@ -106,7 +106,7 @@ Manages capsule identity, immutable versions, lifecycle, ownership, authority, d
 
 ### Capsule Resolver
 
-Resolves knowledge by purpose, identity, applicability, authority, time, evidence sufficiency, dependencies, and contradictions.
+Resolves knowledge by purpose, identity, applicability, authority, time, evidence sufficiency, dependencies, and contradictions ([`capsule-resolver`](capsule-resolver)). Requests use KCP §5 or CQL `RESOLVE`; results are digest-bound bundles with an inspectable plan that can be replayed.
 
 ### Capsule Runtime
 
@@ -114,7 +114,11 @@ Serves capsules locally or remotely, enforces policies, adapts capsule views, re
 
 ### Capsule Evaluator
 
-Evaluates answers and decisions against capsule contracts using deterministic checks first and bounded LLM judgement only for residual semantic questions.
+Evaluates answers and decisions against capsule contracts using deterministic checks first and bounded LLM judgement only for residual semantic questions ([`capsule-evaluator`](capsule-evaluator)). It reports findings with their triggering cues, plus Evaluation Surface Reduction, Epistemic Fidelity, and Confidence Laundering Risk scores.
+
+### Agent exchange (separate product)
+
+Governing what AI agents and tools may *do* (contracts, grants, approvals, budgets, signed receipts, MCP and A2A) now lives in its own repository, `capsule-exchange`. CapsuleDB stays focused on knowledge. The two connect in one place: when an agent's result cites a capsule version (`kc://…@version`) as evidence, the exchange checks that it is still published. It does this by reading a CapsuleDB registry database read-only, with no shared code.
 
 ### Capsule Observatory
 
@@ -344,25 +348,25 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 - [ ] Add human review workflow (the `capsule-registry` lifecycle gate provides the mechanism; no queueing/UI yet)
 - [ ] Add delta compilation for changed source spans
 
-## Phase 4 — Capsule Resolver
+## Phase 4 — Capsule Resolver ([`capsule-resolver`](capsule-resolver))
 
-- [ ] Define the resolution request contract
-- [ ] Add purpose resolution
-- [ ] Add identity and permission filtering
-- [ ] Add capsule-type planning
-- [ ] Add temporal version resolution
-- [ ] Add applicability evaluation
-- [ ] Add authority ordering
-- [ ] Add evidence-sufficiency gates
-- [ ] Add dependency completion
-- [ ] Add contradiction bundles
-- [ ] Add known-gap reporting
-- [ ] Add lexical discovery index
-- [ ] Add optional semantic discovery index
-- [ ] Add dependency index
-- [ ] Add contradiction index
-- [ ] Generate inspectable resolution plans
-- [ ] Support replayable resolution
+- [x] Define the resolution request contract
+- [x] Add purpose resolution
+- [x] Add identity and permission filtering
+- [x] Add capsule-type planning
+- [x] Add temporal version resolution
+- [x] Add applicability evaluation
+- [x] Add authority ordering
+- [x] Add evidence-sufficiency gates
+- [x] Add dependency completion
+- [x] Add contradiction bundles
+- [x] Add known-gap reporting
+- [x] Add lexical discovery index
+- [ ] Add optional semantic discovery index (the `SemanticIndex` trait is the hook; no index ships)
+- [x] Add dependency index (built per request from the candidate set)
+- [x] Add contradiction index (built per request from the candidate set)
+- [x] Generate inspectable resolution plans
+- [x] Support replayable resolution
 
 ## Phase 5 — Capsule Runtime
 
@@ -380,26 +384,26 @@ The initial goal is not to build a new disk engine. The initial innovation is th
 - [ ] Add usage telemetry
 - [ ] Add SDKs for Python and TypeScript
 
-## Phase 6 — Epistemic Evaluation Engine
+## Phase 6 — Epistemic Evaluation Engine ([`capsule-evaluator`](capsule-evaluator))
 
-- [ ] Define evaluation contracts inside capsules
-- [ ] Add answer claim decomposition
-- [ ] Map answer claims to supporting capsules
-- [ ] Detect unsupported claims
-- [ ] Detect applicability expansion
-- [ ] Detect inference-to-fact conversion
-- [ ] Detect association-to-causation conversion
-- [ ] Detect confidence-ceiling violations
-- [ ] Detect missing mandatory qualifications
-- [ ] Detect contradiction suppression
-- [ ] Detect evidence multiplication from shared sources
-- [ ] Add deterministic evaluation rules
-- [ ] Add bounded LLM-as-a-judge mode
-- [ ] Add judge-discretion levels
-- [ ] Add evaluation-surface manifests
-- [ ] Add Evaluation Surface Reduction Score
-- [ ] Add Epistemic Fidelity Score
-- [ ] Add Confidence Laundering Risk Score
+- [x] Define evaluation contracts inside capsules (`evaluation_contract` in `capsule-core`)
+- [x] Add answer claim decomposition
+- [x] Map answer claims to supporting capsules
+- [x] Detect unsupported claims
+- [x] Detect applicability expansion
+- [x] Detect inference-to-fact conversion
+- [x] Detect association-to-causation conversion
+- [x] Detect confidence-ceiling violations
+- [x] Detect missing mandatory qualifications
+- [x] Detect contradiction suppression
+- [x] Detect evidence multiplication from shared sources
+- [x] Add deterministic evaluation rules
+- [x] Add bounded LLM-as-a-judge mode
+- [x] Add judge-discretion levels
+- [x] Add evaluation-surface manifests
+- [x] Add Evaluation Surface Reduction Score
+- [x] Add Epistemic Fidelity Score
+- [x] Add Confidence Laundering Risk Score
 
 ## Phase 7 — Capsule Studio
 
@@ -499,7 +503,7 @@ CapsuleDB/
 
 ## Current status
 
-Phases 0-3 are implemented:
+Phases 0-4 and 6 are implemented:
 
 - The Knowledge Capsule specification, KCP v0.1 protocol draft, `.kcap` package format, and a machine-checkable JSON Schema are defined under `docs/specification/`, `protocol/`, and `schemas/`.
 - `capsule-core` parses, validates, hashes, and enforces lifecycle transitions for capsule documents.
@@ -507,7 +511,12 @@ Phases 0-3 are implemented:
 - `capsule-compiler` turns text/Markdown/HTML sources into draft candidate capsules deterministically: span-bound claim extraction, epistemic-status classification, qualification/exclusion/condition detection, evidence-duplication detection, and immediate `capsule_core::validate` pre-validation — no LLM step yet. PDF ingestion is explicitly unsupported for now.
 - `capsule-cli` (`capsule` binary) supports `inspect`, `validate`, `pack`, `unpack`, `compile`, and `registry <register|transition|publish|get|list|history|dependencies|dependents|evidence|audit>`. The whole compile → register → approve → publish loop works end to end against the canonical sample capsules in `examples/capsules/` and against ad hoc source documents.
 
-Phase 4 (Capsule Resolver) has not started. See the roadmap below for what's next.
+- `capsule-resolver` (Phase 4) resolves capsules for a purpose from a registry or files into an inspectable, replayable bundle: `capsule resolve --cql …` runs the CQL `RESOLVE` example below as written.
+- `capsule-evaluator` (Phase 6) checks answers against capsule contracts with twelve deterministic detectors and an optional bounded judge (`capsule evaluate`).
+
+Phase 5 (runtime and SDKs), Phase 7 (Studio), Phase 8 (Observatory), and Phases 9–10 have not started. See the roadmap below.
+
+The agent and tool exchange that used to live here is now the separate `capsule-exchange` repository. It reads a CapsuleDB `registry.db` to check capsule evidence (set `evidence.capsuledb_registry` in its node config).
 
 ---
 

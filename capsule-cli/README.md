@@ -59,3 +59,24 @@ detected qualifications/exclusions/conditions, bare `kc://` references
 already run against each candidate — see `capsule-compiler/README.md`.
 A typical next step is `capsule registry register drafts/001.json --actor
 you` once you've reviewed a candidate.
+
+## Resolve
+
+```bash
+capsule resolve --capsules examples/capsules --cql 'RESOLVE policy_rule
+ABOUT "customer data retention"
+FOR purpose "privacy review"
+AS OF "2026-08-01"'                                     # or --cql path/to/query.cql, or --request req.json
+capsule resolve --registry registry.db --cql query.cql --json > bundle.json
+capsule resolve --registry registry.db --replay bundle.json   # exit 3 if the result drifted
+```
+
+See [`capsule-resolver`](../capsule-resolver/README.md).
+
+## Evaluate
+
+```bash
+capsule evaluate --answer answer.txt --capsules examples/capsules [--surface surface.yaml] [--judge none|anthropic] [--json]
+```
+
+Exits 2 when the verdict is `fail`. See [`capsule-evaluator`](../capsule-evaluator/README.md).

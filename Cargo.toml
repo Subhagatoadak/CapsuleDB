@@ -5,6 +5,8 @@ members = [
     "capsule-cli",
     "capsule-registry",
     "capsule-compiler",
+    "capsule-evaluator",
+    "capsule-resolver",
 ]
 
 [workspace.package]
@@ -26,3 +28,6 @@ clap = { version = "4", features = ["derive"] }
 tar = "0.4"
 flate2 = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
+serde_yaml = "0.9"
+tiny_http = "0.12"
+ureq = "2"

@@ -260,6 +260,13 @@ impl Registry {
         Ok(Some(self.build_record(logical_id, version)?))
     }
 
+    /// Every registered logical ID, sorted.
+    pub fn list_logical_ids(&self) -> Result<Vec<String>, RegistryError> {
+        let mut stmt = self.conn.prepare("SELECT DISTINCT logical_id FROM capsule_versions ORDER BY logical_id")?;
+        let ids = stmt.query_map([], |row| row.get::<_, String>(0))?.collect::<Result<Vec<_>, _>>()?;
+        Ok(ids)
+    }
+
     /// All registered versions of a logical ID, newest SemVer first.
     pub fn list_versions(&self, logical_id: &str) -> Result<Vec<CapsuleRecord>, RegistryError> {
         let mut stmt = self.conn.prepare("SELECT version FROM capsule_versions WHERE logical_id = ?1")?;

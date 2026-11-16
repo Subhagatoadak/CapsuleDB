@@ -1,0 +1,1 @@
+Paid search campaigns produced an estimated 6-9% incremental lift in conversions in Q1 2026, based on a single geo-holdout experiment that has not yet been replicated. However, a preliminary audit found the holdout markets were not fully randomized, which may bias the lift estimate upward; that dispute is unresolved.

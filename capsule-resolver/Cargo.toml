@@ -1,0 +1,17 @@
+[package]
+name = "capsule-resolver"
+description = "Resolves Knowledge Capsules by purpose, identity, time, applicability, authority, evidence, dependencies, and contradictions, into an inspectable, replayable plan"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+capsule-core = { path = "../capsule-core" }
+capsule-registry = { path = "../capsule-registry" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+semver.workspace = true
+thiserror.workspace = true
+regex.workspace = true

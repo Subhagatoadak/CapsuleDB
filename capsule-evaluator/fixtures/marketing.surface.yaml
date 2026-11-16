@@ -1,0 +1,23 @@
+# Evaluation surface for marketing-incrementality answers.
+id: marketing-incrementality
+version: 1.0.0
+description: >
+  Every deterministic check. A judge may only decide whether one claim is
+  supported by one capsule, or whether a qualification was conveyed in other
+  words, choosing a fixed label.
+thresholds:
+  support: 0.5
+  related: 0.3
+  qualification: 0.5
+  qualification_floor: 0.25
+  overclaim: 0.6
+  ceiling_tolerance: 0.05
+rules:
+  - id: lift-is-q1-only
+    description: answers citing the Q1 2026 lift must not present it as a forecast
+    when_capsule: kc://marketing/incrementality/paid-search-lift-q1-2026
+    forbid: ["will deliver", "will produce", "going forward"]
+judge:
+  discretion: classify_with_rationale
+  may_answer: [claim_support, qualification_conveyed]
+  max_calls: 10
